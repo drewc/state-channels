@@ -2,7 +2,7 @@ Source: gerbil
 Section: devel
 Priority: optional
 Maintainer: Drew Crampsie <me@drewc.ca> 
-Build-Depends: debhelper, texinfo, libssl-dev, gambc, zlib1g-dev, libsqlite3-dev, libyaml-dev, libxml2-dev, libleveldb-dev, libmysqlclient-dev
+Build-Depends: debhelper, texinfo, libssl-dev, gambc, zlib1g-dev, libsqlite3-dev, libyaml-dev, libxml2-dev, libleveldb-dev, libmysqlclient-dev, liblmdb-dev
 Standards-Version: 4.0.1
 Homepage: https://github.com/vyzo/gerbil
 
