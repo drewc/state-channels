@@ -1,0 +1,367 @@
+#+title: Port to JS: Step 1
+#+date: <2023-03-13 14:53>
+#+description: Time to port this over to JavaScript
+#+filetags: JavaScrip Scheme Guile Gambit Gerbil
+
+* Getting Started
+
+This is the first time I've ever tried to use =state-channels= at all.
+
+** Make our own fork
+
+#+begin_src sh
+  # drewc@musix ~/me/MuKn/src$
+  mkdir state-channels
+  cd state-channels/
+  drewc@musix ~/me/MuKn/src/state-channels$ git init --initial-branch=main
+  git pull   git@github.com:drewc/state-channels.git
+#+end_src
+
+** Try the build!
+
+#+begin_src sh
+   # ~/me/MuKn/src/state-channels$
+  chmod 755 ./build
+  ./build gerbil
+  bash: ./build: /bin/bash: bad interpreter: No such file or directory
+
+  head -n1 ./build
+  #!/bin/bash
+#+end_src
+
+Ok, easy enough. Time for some patches to make sure we use the correct binaries.
+
+* Patch Shebangs et al.
+
+First let's patch the shebang.
+
+#+begin_src sh :session state-patch-shebangs
+  export STATE_CHAN_SRC=$(cd ../.. && pwd)
+  export STATE_CHAN_BUILD=$STATE_CHAN_SRC/build
+
+  sed -i 's|/bin/bash|/usr/bin/env bash|' $STATE_CHAN_BUILD
+#+end_src
+
+
+  Now try again.
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  $STATE_CHAN_BUILD gerbil
+#+end_src
+
+#+begin_example
+mkdir: cannot create directory ‘sock’: File exists
+/home/drewc/me/MuKn/src/state-channels/build: backends/build: /usr/bin/guile: bad interpreter: No such file or directory
+/home/drewc/me/MuKn/src/state-channels/build: backends/build: /usr/bin/guile: bad interpreter: No such file or directory
+#+end_example
+
+Ok, more patches to paths.
+
+A quick look says this:
+
+#+begin_src bash
+   chmod 755 bin/cli
+    mkdir sock
+    gcc src/ownip.c -o bin/ownip
+    chmod 755 backends/build
+    chmod 755 backends/diff
+    chmod 755 backends/$SCM/scm
+    chmod 755 backends/$SCM/clish.ss
+    backends/build $SCM
+    backends/build filesocks_unix
+    chmod 755 tests/test1.sh
+#+end_src
+
+Lets see what the =backends/build= has.
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  head -n1 $STATE_CHAN_SRC/backends/build
+#+end_src
+=>
+#+begin_example
+#!/usr/bin/guile --no-auto-compile
+#+end_example
+
+Yup! we can fix that as well
+
+#+begin_src sh :session state-patch-shebangs
+  sed -i 's|/usr/bin/guile \(.*\)|/usr/bin/env -S guile \1|' $STATE_CHAN_SRC/backends/build
+#+end_src
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  head -n1 $STATE_CHAN_SRC/backends/build
+#+end_src
+
+#+begin_example
+#!/usr/bin/env -S guile --no-auto-compile
+#+end_example
+
+Now?
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  $STATE_CHAN_BUILD gerbil
+#+end_src
+
+#+begin_example
+mkdir: cannot create directory ‘sock’: File exists
+../src/llruntime.ss
+../src/socks.ss
+../src/clish.ss
+../bin/scm
+../src/files.ss
+#+end_example
+
+Does it work?
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  $STATE_CHAN_SRC/tests/test1.sh
+#+end_src
+
+#+begin_example
+sh: /home/drewc/me/MuKn/src/state-channels/tests/test1.sh: /bin/bash: bad interpreter: No such file or directory
+#+end_example
+
+I think I know how to fix that :)
+
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+
+  sed -i 's|/bin/bash|/usr/bin/env bash|' $STATE_CHAN_SRC/tests/test1.sh
+#+end_src
+
+
+Now?
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  $STATE_CHAN_SRC/tests/test1.sh
+#+end_src
+
+#+begin_example
+Files OUT1_1.txt and OUT differ
+Files OUT0 and OUT differ
+Files OUT1 and OUT differ
+Files OUT0_scheduled and OUT differ
+Files OUT1_scheduled and OUT differ
+Files OUT2_scheduled and OUT differ
+Files OUT3_scheduled and OUT differ
+#+end_example
+
+Well that sucks. The README does say the gerbil version does not work, so that was not unexpected.
+
+* Build the =guile= version
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  $STATE_CHAN_BUILD guile
+#+end_src
+
+#+begin_example
+mkdir: cannot create directory ‘sock’: File exists
+../src/llruntime.ss
+../src/socks.ss
+../src/clish.ss
+../bin/scm
+../src/files.ss
+#+end_example
+
+* Try the tests (again)
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  $STATE_CHAN_SRC/tests/test1.sh
+#+end_src
+
+
+They still fail.
+
+#+begin_example
+Files OUT1_1.txt and OUT differ
+Files OUT0 and OUT differ
+Files OUT1 and OUT differ
+Files OUT0_scheduled and OUT differ
+Files OUT1_scheduled and OUT differ
+Files OUT2_scheduled and OUT differ
+Files OUT3_scheduled and OUT differ
+#+end_example
+
+They seem to re-create a file called out every test and ~rm -f $TESTS/OUT~ at the very end. Let's get rid of that and see!
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  $STATE_CHAN_SRC/tests/test1.sh
+  echo Catting out:
+  cat $STATE_CHAN_SRC/tests/OUT
+  echo done
+#+end_src
+
+#+begin_example
+Files OUT1_1.txt and OUT differ
+Files OUT0 and OUT differ
+Files OUT1 and OUT differ
+Files OUT0_scheduled and OUT differ
+Files OUT1_scheduled and OUT differ
+Files OUT2_scheduled and OUT differ
+Files OUT3_scheduled and OUT differ
+Catting out:
+done
+#+end_example
+
+Well that doesn't help. The test script also has a bunch of ~2> /dev/null~ forms. Well, sometimes when testing one needs to see the errors :D. Remove them and try again.
+
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  $STATE_CHAN_SRC/tests/test1.sh
+#+end_src
+=>
+#+begin_example
+/home/drewc/me/MuKn/src/state-channels/tests/test1.sh: /home/drewc/me/MuKn/src/state-channels/bin/scm: /bin/bash: bad interpreter: No such file or directory
+Files OUT1_1.txt and OUT differ
+/home/drewc/me/MuKn/src/state-channels/tests/test1.sh: /home/drewc/me/MuKn/src/state-channels/src/clish.ss: /usr/bin/guile: bad interpreter: No such file or directory
+Files OUT0 and OUT differ
+/home/drewc/me/MuKn/src/state-channels/tests/test1.sh: /home/drewc/me/MuKn/src/state-channels/src/clish.ss: /usr/bin/guile: bad interpreter: No such file or directory
+Files OUT1 and OUT differ
+/home/drewc/me/MuKn/src/state-channels/tests/test1.sh: /home/drewc/me/MuKn/src/state-channels/src/clish.ss: /usr/bin/guile: bad interpreter: No such file or directory
+Files OUT0_scheduled and OUT differ
+/home/drewc/me/MuKn/src/state-channels/tests/test1.sh: /home/drewc/me/MuKn/src/state-channels/src/clish.ss: /usr/bin/guile: bad interpreter: No such file or directory
+Files OUT1_scheduled and OUT differ
+/home/drewc/me/MuKn/src/state-channels/tests/test1.sh: /home/drewc/me/MuKn/src/state-channels/src/clish.ss: /usr/bin/guile: bad interpreter: No such file or directory
+Files OUT2_scheduled and OUT differ
+/home/drewc/me/MuKn/src/state-channels/tests/test1.sh: /home/drewc/me/MuKn/src/state-channels/src/clish.ss: /usr/bin/guile: bad interpreter: No such file or directory
+Files OUT3_scheduled and OUT differ
+#+end_example
+
+More shebangs.
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  sed -i 's|/bin/bash|/usr/bin/env bash|' $STATE_CHAN_SRC/bin/scm
+#+end_src
+
+#+begin_src sh :session state-patch-shebangs
+  sed -i 's|/usr/bin/guile \(.*\)|/usr/bin/env -S guile \1|' $STATE_CHAN_SRC/src/clish.ss
+#+end_src
+
+And again?
+
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  $STATE_CHAN_SRC/tests/test1.sh
+#+end_src
+=>
+#+begin_example
+/gnu/store/chfwin3a4qp1znnpsjbmydr2jbzk0d6y-bash-minimal-5.1.8/bin/bash: line 1: /home/drewc/me/MuKn/src/state-channels/bin/extip: Permission denied
+#+end_example
+
+Ok, first line lol.
+
+
+#+begin_src sh :session state-patch-shebangs
+chmod 755 $STATE_CHAN_SRC/bin/extip
+#+end_src
+
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  sed -i 's|/bin/bash|/usr/bin/env bash|' $STATE_CHAN_SRC/bin/extip
+#+end_src
+
+#+begin_src sh :session state-patch-shebangs :results verbatim :wrap example
+  $STATE_CHAN_SRC/tests/test1.sh
+#+end_src
+
+#+begin_example
+< [31;49m![39;49m24.86.36.72/10.42.1.254/0:0 [10.42.1.254:./_0/0]
+<< 24.86.36.72/10.42.1.254/0:0
+;;; Stat of /home/drewc/me/MuKn/src/state-channels/examples/../src/./eth.ss failed:
+;;; In procedure stat: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/examples/../src/./eth.ss"
+Backtrace:
+           0 (primitive-load "/home/drewc/me/MuKn/src/state-channels/examples/../src/./eth.ss")
+
+ERROR: In procedure primitive-load:
+In procedure open-file: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/examples/../src/./eth.ss"
+Files OUT1_1.txt and OUT differ
+;;; note: auto-compilation is enabled, set GUILE_AUTO_COMPILE=0
+;;;       or pass the --no-auto-compile argument to disable.
+;;; compiling /home/drewc/me/MuKn/src/state-channels/src/./././aliases.ss
+;;; compiled /home/drewc/.cache/guile/ccache/3.0-LE-8-4.6/home/drewc/me/MuKn/src/state-channels/src/aliases.ss.go
+;;; compiling /home/drewc/me/MuKn/src/state-channels/src/./././scheds.ss
+;;; compiled /home/drewc/.cache/guile/ccache/3.0-LE-8-4.6/home/drewc/me/MuKn/src/state-channels/src/scheds.ss.go
+;;; compiling /home/drewc/me/MuKn/src/state-channels/src/./././procs.ss
+;;; compiled /home/drewc/.cache/guile/ccache/3.0-LE-8-4.6/home/drewc/me/MuKn/src/state-channels/src/procs.ss.go
+;;; compiling /home/drewc/me/MuKn/src/state-channels/src/./././ipc.ss
+: warning: possibly unbound variable `the-procph0'
+: warning: possibly unbound variable `account-byUID'
+;;; compiled /home/drewc/.cache/guile/ccache/3.0-LE-8-4.6/home/drewc/me/MuKn/src/state-channels/src/ipc.ss.go
+;;; compiling /home/drewc/me/MuKn/src/state-channels/src/./././calls.ss
+;;; compiled /home/drewc/.cache/guile/ccache/3.0-LE-8-4.6/home/drewc/me/MuKn/src/state-channels/src/calls.ss.go
+;;; compiling /home/drewc/me/MuKn/src/state-channels/src/./././procg.ss
+;;; /home/drewc/me/MuKn/src/state-channels/src/./././procg.ss:118:26: warning: possibly unbound variable `procl'
+;;; /home/drewc/me/MuKn/src/state-channels/src/./././procg.ss:158:25: warning: possibly unbound variable `_incmsgno'
+;;; compiled /home/drewc/.cache/guile/ccache/3.0-LE-8-4.6/home/drewc/me/MuKn/src/state-channels/src/procg.ss.go
+;;; compiling /home/drewc/me/MuKn/src/state-channels/src/./././procl.ss
+;;; compiled /home/drewc/.cache/guile/ccache/3.0-LE-8-4.6/home/drewc/me/MuKn/src/state-channels/src/procl.ss.go
+;;; compiling /home/drewc/me/MuKn/src/state-channels/src/./././proch.ss
+;;; compiled /home/drewc/.cache/guile/ccache/3.0-LE-8-4.6/home/drewc/me/MuKn/src/state-channels/src/proch.ss.go
+;;; compiling /home/drewc/me/MuKn/src/state-channels/src/./././procph.ss
+;;; compiled /home/drewc/.cache/guile/ccache/3.0-LE-8-4.6/home/drewc/me/MuKn/src/state-channels/src/procph.ss.go
+< [31;49m![39;49m24.86.36.72/10.42.1.254/0:0 [10.42.1.254:./_0/0]
+<< 24.86.36.72/10.42.1.254/0:0
+;;; Stat of /home/drewc/me/MuKn/src/state-channels/src/./././eth.ss failed:
+;;; In procedure stat: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Backtrace:
+           0 (primitive-load "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss")
+
+ERROR: In procedure primitive-load:
+In procedure open-file: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Files OUT0 and OUT differ
+< [31;49m![39;49m24.86.36.72/10.42.1.254/0:0 [10.42.1.254:./_0/0]
+<< 24.86.36.72/10.42.1.254/0:0
+;;; Stat of /home/drewc/me/MuKn/src/state-channels/src/./././eth.ss failed:
+;;; In procedure stat: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Backtrace:
+           0 (primitive-load "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss")
+
+ERROR: In procedure primitive-load:
+In procedure open-file: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Files OUT1 and OUT differ
+< [31;49m![39;49m24.86.36.72/10.42.1.254/0:0 [10.42.1.254:./_0/0]
+<< 24.86.36.72/10.42.1.254/0:0
+;;; Stat of /home/drewc/me/MuKn/src/state-channels/src/./././eth.ss failed:
+;;; In procedure stat: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Backtrace:
+           0 (primitive-load "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss")
+
+ERROR: In procedure primitive-load:
+In procedure open-file: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Files OUT0_scheduled and OUT differ
+< [31;49m![39;49m24.86.36.72/10.42.1.254/0:0 [10.42.1.254:./_0/0]
+<< 24.86.36.72/10.42.1.254/0:0
+
+ERROR: In procedure primitive-load:
+In procedure open-file: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Files OUT1_scheduled and OUT differ
+< [31;49m![39;49m24.86.36.72/10.42.1.254/0:0 [10.42.1.254:./_0/0]
+<< 24.86.36.72/10.42.1.254/0:0
+;;; Stat of /home/drewc/me/MuKn/src/state-channels/src/./././eth.ss failed:
+;;; In procedure stat: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Backtrace:
+           0 (primitive-load "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss")
+
+ERROR: In procedure primitive-load:
+In procedure open-file: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Files OUT2_scheduled and OUT differ
+< [31;49m![39;49m24.86.36.72/10.42.1.254/0:0 [10.42.1.254:./_0/0]
+<< 24.86.36.72/10.42.1.254/0:0
+;;; Stat of /home/drewc/me/MuKn/src/state-channels/src/./././eth.ss failed:
+;;; In procedure stat: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Backtrace:
+           0 (primitive-load "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss")
+
+ERROR: In procedure primitive-load:
+In procedure open-file: No such file or directory: "/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss"
+Files OUT3_scheduled and OUT differ
+#+end_example
+
+
+* Conclusion : Step 1 done.
+
+As of right now there is not a file with that name,
+=/home/drewc/me/MuKn/src/state-channels/src/./././eth.ss=. So after a full day's work I think I'll stop there and hope this is solved shortly.
+
+There have been some upstream commits today so I'll pull those afterwards and see if they help.
+
+For now, commit and query. Until next time!

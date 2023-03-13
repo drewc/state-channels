@@ -1,0 +1,20 @@
+#+TITLE:  State Channels Library
+
+(C) MUKN  2022, 2023
+
+
+#+begin_src sh
+  git@github.com:drewc/state-channels.git
+#+end_src
+
+
+
+* Emacs
+
+
+#+begin_src emacs-lisp
+  (defun state-channels/create-new-log ()
+    (interactive)
+    (let ((org-static-blog-drafts-directory "~/me/MuKn/src/state-channels/doc/log"))
+      (org-static-blog-create-new-draft)))
+#+end_src
