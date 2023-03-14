@@ -1,0 +1,260 @@
+#+title: Port to JS: Stage 2, mp1_1.ss
+#+date: <2023-03-13 17:39>
+#+description: I meant Step 2! Blame the long day.
+#+filetags: JavaScript Scheme Guile Gambit Gerbil
+
+* Intro
+
+#+begin_quote
+If you follow what is explained on the README.txt of:
+https://github.com/MuKnSys/state-channelsI.e. you do:
+
+cd tmp
+mkdir sc
+cd sc
+git init
+git pull https://github.com/MuKnSys/state-channels
+
+chmod 755 ./build
+./build gerbil
+
+And then (just to try), you do:
+
+bin/scm examples/mp1_1.ss
+
+Then to shunt all the dependencies (almost), you do:
+
+backends/build filesocks_dummy
+
+And then again:
+
+bin/scm examples/mp1_1.ss
+
+should still work, although at that stage, it doesn't performs any other I/O than outputting on the console.=> that's with this one that one should start trying compiling ; if you succeed, that means that the compiler compiles all the code, in fact.
+#+end_quote
+
+
+#+begin_src sh :session state-stage2 :results verbatim :wrap example
+  export STATE_CHAN_SRC=$(cd ../.. && pwd)
+  export STATE_CHAN_BUILD=$STATE_CHAN_SRC/build
+  cd $STATE_CHAN_SRC
+  git pull
+  $STATE_CHAN_BUILD gerbil
+#+end_src
+
+#+begin_example
+mkdir: cannot create directory ‘sock’: File exists
+../src/llioruntime.ss
+../src/llruntime.ss
+../src/socks.ss
+../src/clish.ss
+../bin/scm
+../src/files.ss
+../src/eth.ss
+../bin/eth
+../bin/solc
+#+end_example
+
+
+Ok, so does it work?
+
+#+begin_src sh :session state-stage2 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1.ss
+#+end_src
+
+#+begin_example
+
+sh: bin/scm: /bin/bash: bad interpreter: No such file or directory
+#+end_example
+
+Fuck, I thought I got rid of those. Ah, the build does a new one. Ok.
+
+#+begin_src sh :session state-stage2 :results verbatim :wrap example
+  sed -i 's|/bin/bash|/usr/bin/env bash|' $STATE_CHAN_SRC/bin/scm
+#+end_src
+
+#+begin_src sh :session state-stage2 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1.ss
+#+end_src
+=>
+#+begin_example
+
+,*** ERROR IN gx#core-expand-import%__% -- Syntax Error
+,*** ERROR IN (string)@1.9
+--- Syntax Error: Cannot find library module
+... form:   :mukn/state-channels/examples/mp1_1.ss
+#+end_example
+
+Nope. I think I know why but the script needs looking at.
+
+* Look at the script
+
+Here's =bin/scm=.
+
+#+begin_src bash
+  #!/usr/bin/env bash
+
+  if [[ "$1" == "" ]]; then
+    echo "scm <PROG> expected"
+  else
+    gxi -e '(import :mukn/state-channels/'"$1"')'
+  fi
+#+end_src
+
+That's similar to what I expected. Gerbil does not import files that way. Let's try what I know.
+
+#+begin_src sh :session state-stage2 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1;
+#+end_src
+
+#+begin_example
+
+,*** ERROR IN gx#core-expand-import%__% -- Syntax Error
+,*** ERROR IN (string)@1.9
+--- Syntax Error: Cannot find library module
+... form:   :mukn/state-channels/examples/mp1_1
+#+end_example
+
+Ok, there is no library module with that name. In fact, the user I am building this under does not even have a =~/.gerbil=?
+
+Let's see build scripts.
+
+#+begin_src scheme
+#!/usr/bin/env -S guile --no-auto-compile
+!#
+(load "buildlib.scm")
+
+;; TODO:
+;; => read the list of files to copy directly from inside the backend's directory contents ;
+;; => enable several backends to be built in the same time ;
+;; => for commands, have the launcher automatically generated ;
+;; => if directories like $SC_HOME/bin doesn't exists, create them automatically ;
+;;
+(define BACKEND (list-ref (command-line) 1))
+
+(if (or (equal? BACKEND "guile")
+        (equal? BACKEND "gerbil"))
+  (build "llioruntime.ss"
+         "llruntime.ss"
+         "socks.ss"
+         "clish.ss"
+         "scm"))
+
+(if (equal? BACKEND "filesocks_unix")
+  (build "files.ss"))
+
+(if (equal? BACKEND "filesocks_dummy")
+  (build "llioruntime.ss"
+         "files.ss"
+         "socks.ss"))
+
+(if (equal? BACKEND "geth_dev")
+  (build "eth.ss"
+         "eth"
+         "solc"))
+
+(if (equal? BACKEND "libp2p_mockup") ;; Broken
+  (build "libp2p.ss"))
+
+#+end_src
+
+I don't see those modules there. Where are things placed when built?
+
+Down at the end of the file I see this.
+
+#+begin_src scheme
+  (define (build . LF)
+ ;(define RDIFF (apply diff* LF))
+ ;(set! RDIFF (filter (lambda (X) (not (null? X))) RDIFF))
+  (if #f ;;(not (null? RDIFF)) ;; TODO: do that only if we know that the currently installed version is the one to build
+    (for-each (lambda (X)
+                (display (car X))
+                (display "\n")) RDIFF)
+    (apply cp* LF)))
+
+(chdir BACKENDS)
+#+end_src
+
+
+Oh oh. I didn't bother to look at the build in detail before as I was just following the =README.txt=. That appears to not build things whatsoever.
+
+#+begin_src scheme
+  (define (cp FNAME) ;; TODO: keep file attributes (?)
+  (let* ((SRC (string-append DIR "/" FNAME))
+         (DEST (string-append "../" (destdir FNAME) "/" FNAME))
+        )
+    (if (proceed? FNAME) ;; FIXME: crappy way
+    (begin
+      (display (string-append "Copying " SRC " => " DEST "\n"))
+      (copy-file SRC DEST)))))
+
+(define (cp* . LF)
+  (for-each (lambda (FN)
+              (cp FN))
+            LF))
+#+end_src
+
+It just copies scheme files? How can that work?
+
+I need to ask about it. Perhaps there's a way of using Gerbil like this that I am not familar with.
+
+* Wait, what about the tests?
+
+#+begin_src sh :session state-stage2 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  $STATE_CHAN_SRC/tests/test1.sh
+#+end_src
+
+#+begin_example
+Files OUT1_1.txt and OUT differ
+Files OUT0 and OUT differ
+Files OUT1 and OUT differ
+Files OUT0_scheduled and OUT differ
+Files OUT1_scheduled and OUT differ
+Files OUT2_scheduled and OUT differ
+Files OUT3_scheduled and OUT differ
+#+end_example
+
+Well that's odd. Let's see something. Add this.
+
+#+begin_src sh
+  echo $BIN/scm $EXAMPLES/mp1_1.ss
+  $BIN/scm $EXAMPLES/mp1_1.ss > OUT
+  cat OUT
+  diff -q -U2 OUT1_1.txt OUT
+#+end_src
+
+And try again.
+#+begin_src sh :session state-stage2 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  $STATE_CHAN_SRC/tests/test1.sh
+#+end_src
+
+#+begin_example
+
+/home/drewc/me/MuKn/src/state-channels/bin/scm /home/drewc/me/MuKn/src/state-channels/examples/mp1_1.ss
+core-expand-import%__% -- Syntax Error
+,*** ERROR IN (string)@1.9
+--- Syntax Error: Cannot find library module
+... form:   :mukn/state-channels//home/drewc/me/MuKn/src/state-channels/examples/mp1_1.ss
+Files OUT1_1.txt and OUT differ
+Files OUT0 and OUT differ
+Files OUT1 and OUT differ
+Files OUT0_scheduled and OUT differ
+Files OUT1_scheduled and OUT differ
+Files OUT2_scheduled and OUT differ
+Files OUT3_scheduled and OUT differ
+#+end_example
+
+Yup, that's what I thought. Back to the drawing board.
+
+* Conclusion
+
+The build scripts to not appear to build any libraries or modules for Gerbil.
+
+Therefore I do not think it can work as explained. Stage or Step 3 will be after I figure that part out.
+
+Next Time! :)
