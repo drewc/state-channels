@@ -1,7 +1,7 @@
 #+title: Port to JS: Step 1
 #+date: <2023-03-13 14:53>
 #+description: Time to port this over to JavaScript
-#+filetags: JavaScrip Scheme Guile Gambit Gerbil
+#+filetags: JavaScript Scheme Guile Gambit Gerbil
 
 * Getting Started
 
