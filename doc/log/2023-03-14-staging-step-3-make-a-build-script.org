@@ -1,0 +1,370 @@
+#+title: Staging Step 3: Make a build script
+#+date: <2023-03-14 11:57>
+#+description: Step 3: Make a gerbil build script
+#+filetags: Gerbil gxc Compile Module Library
+
+* Intro
+
+Hey! Finally figured out the environment setup upstream requires for their gerbil intepreter to find the libraries as source files and load the modules that way. My bad, though I did ask about env vars I certainly was not clear or specific enough.
+
+For our/my initial binary I do not want to require any external libraries beyond the bare minimum (like libgambit.so).
+
+** Modify ~scm~ script to work as expected
+
+We first modify the ~scm~ script so that it works and I can easily communicate with upstream.
+
+#+HEADER: :tangle ../../backends/gerbil/scm
+#+begin_src sh :shebang #!/usr/bin/env bash
+  cd $(dirname $0)/..
+  if [[ "$(basename `realpath .`)" == "backends" ]]; then
+      cd ..
+  fi
+  export GERBIL_LOADPATH=$(realpath .)
+
+  echo "Loading $1 from $(pwd)"
+  if [[ "$1" == "" ]]; then
+    echo "scm <PROG> expected"
+  else
+    gxi -e '(import :mukn/state-channels/'"$1"')'
+  fi
+
+#+end_src
+** Build existing and test
+
+
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  export STATE_CHAN_SRC=$(cd ../.. && pwd)
+  export STATE_CHAN_BUILD=$STATE_CHAN_SRC/build
+  cd $STATE_CHAN_SRC
+  git pull
+  $STATE_CHAN_BUILD gerbil
+#+end_src
+
+#+RESULTS:
+#+begin_example
+
+sh-5.1$ sh-5.1$ sh-5.1$ Enter passphrase for key '/home/drewc/.ssh/id_rsa':
+From github.com:drewc/state-channels
+upstream/main
+Updating 4187e2d..cf86e68
+Fast-forward
+ BOOT.ini      |   6 +--
+ src/procph.ss |   2 +-
+ src/scm2js.ss | 120 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 124 insertions(+), 4 deletions(-)
+ create mode 100644 src/scm2js.ss
+mkdir: cannot create directory ‘sock’: File exists
+../src/llioruntime.ss
+../src/llruntime.ss
+../src/socks.ss
+../src/clish.ss
+../bin/scm
+../src/files.ss
+../src/eth.ss
+../bin/eth
+../bin/solc
+#+end_example
+
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1
+#+end_src
+#+RESULTS:
+#+begin_example
+
+Loading examples/mp1_1 from /home/drewc/me/MuKn/src/state-channels
+host-fsock, "src/ipc.ss"@64.15 -- (Argument 1) STRING expected
+(string-append
+!void
+ ":"
+9
+)
+#+end_example
+
+Well, that's new. I bet it's one of yesterday's commits as it somewhat worked with a previous build. So let us back up.
+
+#+begin_src sh :results verbatim :wrap src text
+  git log --pretty=format:"%h - %an, %ar : %s" -16
+#+end_src
+
+#+RESULTS:
+#+begin_src text
+cf86e68 - Drew Crampsie, 17 minutes ago : Merge branch 'MuKnSys:main' into main
+4187e2d - Drew Crampsie, 18 hours ago : Stage 2. Look at the `doc/log`s
+143b160 - HenriLesourd, 10 hours ago : Compiling to Javascript (0-2)
+a28061b - HenriLesourd, 11 hours ago : Compiling to Javascript (0)
+d22f4d5 - Drew Crampsie, 19 hours ago : Merge branch 'MuKnSys:main' into main
+cba8c37 - Drew Crampsie, 21 hours ago : WIP: Port to JS Step 1. Look at doc/log/2023-03-13*
+f8c15c7 - HenriLesourd, 21 hours ago : Extracting backends (8-5)
+15c5982 - HenriLesourd, 21 hours ago : Extracting backends (8-4)
+9ba69db - HenriLesourd, 21 hours ago : Extracting backends (8-3)
+1ba5465 - HenriLesourd, 21 hours ago : Extracting backends (8-2)
+5988db7 - HenriLesourd, 22 hours ago : Extracting backends (8)
+5695e31 - HenriLesourd, 31 hours ago : Extracting backends (7)
+fa98807 - HenriLesourd, 31 hours ago : Extracting backends (6)
+a995721 - HenriLesourd, 32 hours ago : Extracting backends (5)
+4ca935a - HenriLesourd, 2 days ago : Extracting backends (4bis)
+fcfbd5b - HenriLesourd, 2 days ago : Extracting backends (4)
+#+end_src
+
+** Checkout old =ipc.ss=.
+#+begin_src sh
+  git checkout 5695e31 ../../src/ipc.ss
+#+end_src
+
+*** Try it?
+
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1
+#+end_src
+
+#+begin_example
+
+Loading examples/mp1_1 from /home/drewc/me/MuKn/src/state-channels
+core-expand-ref% -- Syntax Error
+,*** ERROR IN "src/ipc.ss"@183.16
+--- Syntax Error: Reference to unbound identifier
+#ref account-byUID)
+... detail: account-byUID at "src/ipc.ss"@183.16
+#+end_example
+
+Nope.
+
+*** Find working version?
+
+#+begin_src sh
+  git stash
+  git checkout 5988db7
+  git stash pop
+  git checkout src/ipc.ss
+#+end_src
+
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1
+#+end_src
+#+begin_example
+
+Loading examples/mp1_1 from /home/drewc/me/MuKn/src/state-channels
+gaddr /bin/sh: line 1: /home/drewc/me/MuKn/src/state-channels/bin/extip: Permission denied/10.42.1.254//bin/sh  line 1
+#+end_example
+
+Getting there!
+
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1
+#+end_src
+#+begin_example
+
+sh-5.1$ Loading examples/mp1_1 from /home/drewc/me/MuKn/src/state-channels
+gaddr /bin/sh: /home/drewc/me/MuKn/src/state-channels/bin/extip: /bin/bash: bad interpreter: No such file or directory/10.42.1.254//bin/sh  /home/drewc/me/MuKn/src/state-channels/bin/extip
+#+end_example
+
+Awesome, I know all about that.
+
+#+begin_src sh
+  git stash
+  git cherry-pick cba8c3
+  git cherry-pick 4187e2d
+  git stash pop
+  git checkout src/ipc.ss
+#+end_src
+
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1
+#+end_src
+#+begin_example
+
+Loading examples/mp1_1 from /home/drewc/me/MuKn/src/state-channels
+host-fsock, "src/ipc.ss"@64.15 -- (Argument 1) STRING expected
+(string-append
+!void
+ ":"
+9
+)
+#+end_example
+
+Damn. Ah wait! LOL that file's in my stash
+
+
+
+#+RESULTS:
+
+
+
+* Make a new branch and start from there
+
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  git stash
+  git checkout -b bin-build 5695e31
+#+end_src
+#+begin_example
+Saved working directory and index state WIP on main: cf86e68 Merge branch 'MuKnSys:main' into main
+Switched to a new branch 'bin-build'
+#+end_example
+
+Ok, new branch! Let's go from here.
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  git stash pop
+  git checkout src/ipc.ss
+#+end_src
+
+#+begin_example
+CONFLICT (modify/delete): doc/log/2023-03-13-port-to-js:-stage-2-mp1_1.ss.org deleted in Updated upstream and modified in Stashed changes.  Version Stashed changes of doc/log/2023-03-13-port-to-js:-stage-2-mp1_1.ss.org left in tree.
+On branch bin-build
+Unmerged paths:
+..." to unstage)
+..." as appropriate to mark resolution)
+	deleted by us:   doc/log/2023-03-13-port-to-js:-stage-2-mp1_1.ss.org
+
+Untracked files:
+..." to include in what will be committed)
+	bin/eth
+	bin/ownip
+	bin/scm
+	bin/solc
+	doc/log/2023-03-14-staging-step-3-make-a-build-script.org
+	src/clish.ss
+	src/eth.ss
+	src/files.ss
+	src/llioruntime.ss
+	src/llruntime.ss
+	src/socks.ss
+	tests/OUT
+
+no changes added to commit (use "git add" and/or "git commit -a")
+The stash entry is kept in case you need it again.
+Updated 0 paths from the index
+#+end_example
+
+Ok, what happens now?
+
+
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1
+#+end_src
+
+#+begin_example
+
+Loading examples/mp1_1 from /home/drewc/me/MuKn/src/state-channels
+core-apply-expander__% -- Syntax Error
+,*** ERROR IN "src/basics.ss"@568.3
+--- Syntax Error: Bad syntax
+... form:   (define N)
+#+end_example
+
+Ok, well, let's move forward!
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  git rm -f doc/log/2023-03-13-port-to-js\:-stage-2-mp1_1.ss.org
+  git cherry-pick cba8c37
+#+end_src
+
+#+begin_example
+
+rm 'doc/log/2023-03-13-port-to-js:-stage-2-mp1_1.ss.org'
+[bin-build ac0ed01] WIP: Port to JS Step 1. Look at doc/log/2023-03-13*
+ Date: Mon Mar 13 15:57:28 2023 -0700
+ 11 files changed, 390 insertions(+), 3 deletions(-)
+ create mode 100644 README.org
+100755 backends/build
+100755 backends/diff
+100755 backends/gerbil/clish.ss
+100755 backends/gerbil/scm
+100755 backends/guile/clish.ss
+100755 backends/guile/scm
+100755 bin/cli
+100755 bin/extip
+100755 build
+ create mode 100644 doc/log/2023-03-13-port-to-js:-step-1.org
+#+end_example
+
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1
+#+end_src
+
+#+begin_example
+Loading examples/mp1_1 from /home/drewc/me/MuKn/src/state-channels
+core-apply-expander__% -- Syntax Error
+,*** ERROR IN "src/basics.ss"@568.3
+--- Syntax Error: Bad syntax
+... form:   (define N)
+#+end_example
+
+Ok, still have that issue? A quick look says what commit fixed that error. =5988db7=.
+
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  git checkout main
+  git branch --force bin-build 5695e31
+  git checkout bin-build
+  chmod 755 ./build
+#+end_src
+
+Ok, back to yesterday's shebangs now.
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  git checkout cba8c37 ./build ./backends/build
+  ./build gerbil
+#+end_src
+#+begin_example
+mkdir: cannot create directory ‘sock’: File exists
+../src/llruntime.ss
+../src/socks.ss
+../src/clish.ss
+../bin/scm
+../src/files.ss
+#+end_example
+
+And after updating the scm binary...
+#+begin_src sh :session state-stage3 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC;
+  bin/scm examples/mp1_1
+#+end_src
+=>
+#+begin_example
+
+Loading examples/mp1_1 from /home/drewc/me/MuKn/src/state-channels
+core-expand-ref% -- Syntax Error
+,*** ERROR IN "src/llruntime.ss"@115.3
+--- Syntax Error: Reference to unbound identifier
+#ref Void)
+... detail: Void at "src/llruntime.ss"@115.3
+#+end_example
+
+Nope, not yet. Getting there!
+
+I cannot find a working version.
+
+* Conclusion
+
+I was convinced that I was mostly doing the right thing yesterday but the proper user environment variable was missing so I cannot say I'm convinced this is a syntax error.
+
+#+begin_quote
+The version that is now on the repo, I don't touch it, it's the "perfect" one.I'm working on some changes that could break what you do, but I don't push them (or either, I would tell you).
+#+end_quote
+
+Damn, I have no idea. I also asked if the commit is something I should cherry pick.
+
+#+begin_quote
+> Should that commit should be cherry picked into one from yesterday or does it work for sure in Gerbil and that syntax error is an issue in my fork?
+#+end_quote
+
+The response.
+#+begin_quote
+No I mean: take the (whole) version of the repo that corresponds to the date of this commit ; it's coherent & with zero problems of the kind.
+#+end_quote
+
+So, in the end, back to the beginning to start from scratch. I'll figure it out!!!
+
+Restarting is a step I take often. Should probably call it refactoring, but it's not, it's starting from the beginning with newfound wisdom.
+
+Kind of like a new belt colour in /karate/. Start over, use what you know, try to avoid the mistakes that prevented you from getting to this belt.
+
+/Kihon Kata Bugendai/!!

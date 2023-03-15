@@ -1,0 +1,321 @@
+#+title: Back to Step 1 - zero problems of the kind
+#+date: <2023-03-14 14:10>
+#+description: Start from scratch again
+#+filetags: Gerbil Gambit Guile Scheme Shebangs
+
+* Why step back?
+
+My last attempt at my fork had an error.
+
+#+begin_example
+Loading examples/mp1_1 from /home/drewc/me/MuKn/src/state-channels
+host-fsock, "src/ipc.ss"@64.15 -- (Argument 1) STRING expected
+(string-append
+#!void
+ ":"
+9
+)
+#+end_example
+
+When I asked about it I was told that the HEAD of main has zero problems of the kind. So I'll go back to where I was yesterday but now with new maps and a different path to follow.
+
+* New Branchs, unforked-main + build-main
+
+#+begin_src sh
+  git remote add unforked git@github.com:MuKnSys/state-channels.git
+  git fetch unforked
+  git checkout -b unforked-main remotes/unforked/main
+  # branch 'unforked-main' set up to track 'unforked/main'.
+  # Switched to a new branch 'unforked-main'
+#+end_src
+
+* Fix Shebangs and chmod again
+
+We know this one! :)
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  export STATE_CHAN_SRC=$(cd ../.. && pwd)
+  export STATE_CHAN_BUILD=$STATE_CHAN_SRC/build
+#+end_src
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  cd $STATE_CHAN_SRC
+  $STATE_CHAN_BUILD gerbil
+#+end_src
+=>
+#+begin_example
+sh: /home/drewc/me/MuKn/src/state-channels/build: Permission denied
+#+end_example
+
+Ok, first things first ... or wait, this is second ... because I didn't do it first. Anyway.
+
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  chmod 755 ./build
+  ./build gerbil
+#+end_src
+=>
+#+begin_example
+sh: ./build: /bin/bash: bad interpreter: No such file or directory
+#+end_example
+
+Awesome, shebang!
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  chmod 755 ./build
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./build
+  sed -i 's|/usr/bin/guile \(.*\)|/usr/bin/env -S guile \1|' backends/build
+  ./build gerbil
+#+end_src
+=>
+#+begin_example
+
+sh-5.1$ mkdir: cannot create directory ‘sock’: File exists
+./build: backends/build: /usr/bin/guile: bad interpreter: No such file or directory
+./build: backends/build: /usr/bin/guile: bad interpreter: No such file or directory
+./build: backends/build: /usr/bin/guile: bad interpreter: No such file or directory
+#+end_example
+
+We know that but I refuse to checkout or cherry pick in order to ensure it's an error I create. Some more shebangs.
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  chmod 755 ./build
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./build
+  sed -i 's|/usr/bin/guile \(.*\)|/usr/bin/env -S guile \1|' backends/build
+  ./build gerbil
+#+end_src
+
+#+begin_example
+
+sh-5.1$ sh-5.1$ mkdir: cannot create directory ‘sock’: File exists
+../src/llioruntime.ss
+../src/llruntime.ss
+../src/socks.ss
+../src/clish.ss
+../bin/scm
+../src/files.ss
+../src/eth.ss
+../bin/eth
+../bin/solc
+#+end_example
+
+Awesome! I also well know the next few but their important to know. Especially breaking down the steps I have to take to make this buildable on my boxes.
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  bin/scm examples/mp1_1
+#+end_src
+=>
+#+begin_example
+sh: bin/scm: /bin/bash: bad interpreter: No such file or directory
+#+end_example
+
+Ok, we know where that file comes from.
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  chmod 755 ./build
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./build backends/gerbil/scm
+  sed -i 's|/usr/bin/guile \(.*\)|/usr/bin/env -S guile \1|' backends/build
+  ./build gerbil
+#+end_src
+
+#+begin_example
+sh-5.1$ sh-5.1$ mkdir: cannot create directory ‘sock’: File exists
+../src/llioruntime.ss
+../src/llruntime.ss
+../src/socks.ss
+../src/clish.ss
+../bin/scm
+../src/files.ss
+../src/eth.ss
+../bin/eth
+../bin/solc
+#+end_example
+
+  And now? I know what the result should be.
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  bin/scm examples/mp1_1
+#+end_src
+=>
+#+begin_example
+core-expand-import%__% -- Syntax Error
+,*** ERROR IN (string)@1.9
+--- Syntax Error: Cannot find library module
+... form:   :mukn/state-channels/examples/mp1_1
+#+end_example
+
+The =GERBIL_LOADPATH= needs to be set.
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  export GERBIL_LOADPATH=$(realpath .)
+  bin/scm examples/mp1_1
+#+end_src
+=>
+#+begin_example
+
+gaddr /bin/sh: /home/drewc/me/MuKn/src/state-channels/bin/extip: /bin/bash: bad interpreter: No such file or directory/10.42.1.254//bin/sh  /home/drewc/me/MuKn/src/state-channels/bin/extip
+#+end_example
+
+Let's do everything in bin.
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  chmod 755 ./build
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./build backends/gerbil/scm
+  sed -i 's|/usr/bin/guile \(.*\)|/usr/bin/env -S guile \1|' backends/build
+  ./build gerbil
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./bin/*
+  export GERBIL_LOADPATH=$(realpath .)
+
+  bin/scm examples/mp1_1
+#+end_src
+
+...
+...
+...
+
+All that does is hang. I bet we need the fake
+
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  chmod 755 ./build
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./build backends/gerbil/scm
+  sed -i 's|/usr/bin/guile \(.*\)|/usr/bin/env -S guile \1|' backends/build
+  ./build gerbil
+  ./backends/build filesocks_dummy
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./bin/*
+  export GERBIL_LOADPATH=$(realpath .)
+
+  bin/scm examples/mp1_1
+#+end_src
+
+Hmmm .... that hangs still. Look further.
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  ./backends/build filesocks_dummy
+#+end_src
+=>
+#+begin_example
+Backtrace:
+           1 (primitive-load "/home/drewc/me/MuKn/src/state-channels/.…")
+In ice-9/boot-9.scm:
+   2007:7  0 (error _ . _)
+
+ice-9/boot-9.scm:2007:7: In procedure error:
+Calc full path !Yet
+#+end_example
+
+Well, that's interesting.
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+   grep -ir 'Calc full' *
+#+end_src
+=>
+#+begin_example
+backends/buildlib.scm:  (error "Calc full path !Yet"))
+#+end_example
+
+ Ok! that's interestinger!
+
+ #+begin_src scheme
+   (define L (command-line))
+   (if (< (length L) 2)
+   (begin
+     (display (car (reverse (string-split (list-ref L 0) #\/))))
+     (display " <ENV> expected\n")
+     (exit 1)))
+
+
+   (define CWD (getcwd))
+   (define CMD (list-ref L 0))
+   (define BACKENDS #f)
+   (if (not (equal? (string-ref CMD 0) #\.))
+       (set! BACKENDS (string-append CWD "/" CMD))
+       (error "Calc full path !Yet"))
+   (set! BACKENDS (string-join (reverse (cdr (reverse (string-split BACKENDS #\/)))) "/"))
+ #+end_src
+
+ Ok, no idea why it cares, but what about without it?
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  backends/build filesocks_dummy
+#+end_src
+=>
+#+begin_example
+../src/llioruntime.ss
+../src/files.ss
+../src/socks.ss
+#+end_example
+
+Ok! Re-write without dot.
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  chmod 755 ./build
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./build backends/gerbil/scm
+  sed -i 's|/usr/bin/guile \(.*\)|/usr/bin/env -S guile \1|' backends/build
+  ./build gerbil
+  backends/build filesocks_dummy
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./bin/*
+  export GERBIL_LOADPATH=$(realpath .)
+
+  bin/scm examples/mp1_1
+#+end_src
+=>
+#+begin_example
+
+sh-5.1$ sh-5.1$ mkdir: cannot create directory ‘sock’: File exists
+../src/llioruntime.ss
+../src/llruntime.ss
+../src/socks.ss
+../src/clish.ss
+../bin/scm
+../src/files.ss
+../src/eth.ss
+../bin/eth
+../bin/solc
+Copying /home/drewc/me/MuKn/src/state-channels/backends/filesocks_dummy/llioruntime.ss => ../src/llioruntime.ss
+../src/files.ss
+../src/socks.ss
+sh-5.1$ sh-5.1$ sh-5.1$ json-parse : empty string
+#+end_example
+
+* Conclusion
+
+Ok. Let's do it in /tmp/. From UPSTREAM.
+
+#+begin_src sh :session state-stage1.5 :results verbatim :wrap example
+  cd /tmp/
+  rm -rf state-channels
+  git clone git@github.com:MuKnSys/state-channels.git
+  cd state-channels
+  chmod 755 ./build
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./build backends/gerbil/scm
+  sed -i 's|/usr/bin/guile \(.*\)|/usr/bin/env -S guile \1|' backends/build
+  ./build gerbil
+  backends/build filesocks_dummy
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./bin/*
+  export GERBIL_LOADPATH=$(realpath .)
+
+  bin/scm examples/mp1_1
+#+end_src
+=>
+#+begin_example
+ Cloning into 'state-channels'...
+100% (714/714), done.
+Copying /tmp/state-channels/backends/gerbil/llioruntime.ss => ../src/llioruntime.ss
+../src/llruntime.ss
+../src/socks.ss
+../src/clish.ss
+../bin/scm
+../src/files.ss
+../src/eth.ss
+../bin/eth
+../bin/solc
+Copying /tmp/state-channels/backends/filesocks_dummy/llioruntime.ss => ../src/llioruntime.ss
+../src/files.ss
+../src/socks.ss
+json-parse : empty string
+#+end_example
+
+Nice. That empty string is not our fault :).
+
+Time to move on. Thank you for coming!
