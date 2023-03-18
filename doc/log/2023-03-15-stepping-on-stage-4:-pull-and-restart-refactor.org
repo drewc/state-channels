@@ -1,0 +1,643 @@
+#+title: Stepping on Stage 4: Pull and Re(start/factor)
+#+date: <2023-03-15 14:57>
+#+description: No idea where this will end
+#+filetags: Guile Gerbil Gambit
+
+* Restarted Intro
+
+Yesterday I managed to get everything working on my end. There was a minor error in upstream which git says is taken care of!
+
+Sleep is a good thing, especially when on a later timezone :)
+
+#+begin_src sh :session state-stage4 :results verbatim :wrap example
+  if [[ -z "$STATE_CHAN_SRC" ]]; then
+   export STATE_CHAN_SRC=$(cd ../.. && pwd)
+  fi;
+  export GERBIL_LOADPATH=$STATE_CHAN_SRC
+  cd $STATE_CHAN_SRC
+#+end_src
+
+#+RESULTS:
+#+begin_example
+#+end_example
+
+** Works? Yup!
+#+begin_src sh :session state-stage4 :results verbatim :wrap example
+  cd /tmp/
+  rm -rf state-channels
+  git clone git@github.com:MuKnSys/state-channels.git
+  cd state-channels
+  chmod 755 ./build
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./build backends/gerbil/scm
+  sed -i 's|/usr/bin/guile \(.*\)|/usr/bin/env -S guile \1|' backends/build
+  ./build gerbil
+  backends/build filesocks_dummy
+  sed -i 's|/bin/bash|/usr/bin/env bash|' ./bin/*
+  export GERBIL_LOADPATH=$(realpath .)
+
+  bin/scm examples/mp1_1
+#+end_src
+=>
+#+begin_example
+sh-5.1$ Cloning into 'state-channels'...
+ Copying /tmp/state-channels/backends/gerbil/llioruntime.ss => ../src/llioruntime.ss
+../src/llruntime.ss
+../src/socks.ss
+../src/clish.ss
+../bin/scm
+../src/files.ss
+../src/eth.ss
+../bin/eth
+../bin/solc
+Copying /tmp/state-channels/backends/filesocks_dummy/llioruntime.ss => ../src/llioruntime.ss
+../src/files.ss
+../src/socks.ss
+sh-5.1$ sh-5.1$ sh-5.1$ smith : 10
+dupont : 10
+durand : 10
+smith : 10
+dupont : 10
+durand : 10
+smith : 10
+dupont : 10
+durand : 10
+---
+PID      NAME   USER    PEER                 SELF
+0^       PR1    smith   ("PR1" "PR2" "PR3")  @micropay@0
+0procg^  GR1    nobody  (_)                  _
+0h_      HOST1  system  (_)                  _
+0ph_     phys   system  (_)                  _
+1^       PR2    dupont  ("PR1" "PR2" "PR3")  @micropay@1
+2^       PR3    durand  ("PR1" "PR2" "PR3")  @micropay@2
+6 procs
+---
+PR1 smith ^
+in:
+rl:
+out:
+transfer PR1=>GR1 (dupont 5) _[31;49m[39;49m
+PR2 dupont ^
+in:
+rl:
+out:
+PR3 durand ^
+in:
+rl:
+out:
+---
+PR1 smith ^
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+rl:
+out:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+PR2 dupont ^
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+rl:
+out:
+PR3 durand ^
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+rl:
+out:
+---
+PR1 smith ^
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m!![39;49m
+rl:
+out:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+PR2 dupont ^?
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m[39;49m
+out:
+PR3 durand ^
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m!![39;49m
+rl:
+out:
+smith : 10
+dupont : 10
+durand : 10
+smith : 5
+dupont : 15
+durand : 10
+smith : 10
+dupont : 10
+durand : 10
+---
+PR1 smith ^?
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m!![39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+out:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+PR2 dupont ^?
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m!![39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m[39;49m
+out:
+PR3 durand ^
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m!![39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m!![39;49m
+rl:
+out:
+smith : 5
+dupont : 15
+durand : 10
+smith : 5
+dupont : 15
+durand : 10
+smith : 10
+dupont : 10
+durand : 10
+---
+PR1 smith ^?
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m!![39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+out:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+PR2 dupont ^?
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m!![39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m[39;49m
+out:
+PR3 durand ^
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m!![39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m!![39;49m
+rl:
+out:
+---
+PR1 smith ^?
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m!![39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m!![39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+out:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+PR2 dupont ^?
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m!![39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m!![39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m[39;49m
+out:
+PR3 durand ^?
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m!![39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m!![39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m[39;49m
+out:
+smith : 5
+dupont : 15
+durand : 10
+smith : 5
+dupont : 15
+durand : 10
+smith : 5
+dupont : 15
+durand : 10
+---
+PR1 smith ^
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m!![39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m!![39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont durand)[31;49m!*[39;49m
+out:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+PR2 dupont ^?
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m!![39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m!![39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m[39;49m
+out:
+PR3 durand ^?
+in:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m[39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith dupont)[31;49m!![39;49m
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith)[31;49m!![39;49m
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m[39;49m
+out:
+#+end_example
+
+Brilliant! Things work. Time to make a binary out of it.
+
+* First, make Gerbil static modules
+
+Right now everything is interpreted at all times. While there is some logic to that approach, and I may even try that in the browser, right now compilation, first to machine code then onto JavaScript, is the best approach.
+
+The Upstream build is a guile script that simply copies things over. We'll try and make it inside the first location and forget about the rest.
+
+Save for the examples. Hrm. Different packages perhaps, different build.ss.
+
+* (r)Sync the branch with Upstream
+
+#+begin_src sh :session state-stage4 :results verbatim :wrap example
+  cd /tmp/state-channels; git pull --quiet
+#+end_src
+#+begin_src sh :session state-stage4 :results verbatim :wrap example
+  git log -1 | cat
+#+end_src
+=>
+#+begin_example
+commit 1dc159b9756fda262b2cdee47797aa2f6fd4f029
+Date:   Wed Mar 15 13:41:06 2023 +0100
+
+    Compiling to Javascript (2)
+#+end_example
+
+
+#+begin_src sh :session state-stage4 :results verbatim :wrap example
+  git remote -v | cat
+#+end_src
+=>
+#+begin_example
+origin	git@github.com:MuKnSys/state-channels.git (fetch)
+origin	git@github.com:MuKnSys/state-channels.git (push)
+#+end_example
+
+
+#+begin_src sh :session state-stage4 :results verbatim :wrap example
+  echo Sync with $GERBIL_LOADPATH
+  cd /tmp/
+  rsync -av /tmp/state-channels/ ./nongit-state-channels/
+  cd nongit-state-channels
+  mv .git /tmp/git-state-channels
+  cd ..
+  rsync -av ./nongit-state-channels/ $GERBIL_LOADPATH/
+#+end_src
+
+
+#+begin_src sh :session state-stage4 :results verbatim :wrap example
+  cd $GERBIL_LOADPATH
+  ./build gerbil
+  backends/build filesocks_dummy
+  bin/scm examples/mp1_1
+#+end_src
+
+
+* Make a library build script
+
+#+begin_src scheme :noweb-ref library-build-script
+    ;; the library module build specification
+    (def lib-build-spec '("src/socks" "examples/mp1" "examples/mp1_1" "exe"))
+    (let src ((fs (directory-files "src")))
+      ;; (displayln "Have " (length fs) " files in src")
+      (if (not (null? fs))
+        (let ((f (car fs)))
+          (displayln "f:" f (equal? f "clish_prg.ss") )
+          (if (and (equal? (path-extension f) ".ss")
+                   (not (equal? f "clish.ss"))
+                   (not (equal? f "scm2js.ss"))
+                   (not (equal? f "clish_prg.ss")))
+             (set! lib-build-spec
+                     (cons (path-expand (path-strip-extension f)
+                                        "src/")
+                           lib-build-spec)))
+                   (src (cdr fs)))))
+
+
+    (def (make-lib)
+      ;; (displayln "Making Library from:" lib-build-spec)
+    (make srcdir: srcdir
+          bindir: srcdir
+          libdir: (path-expand "lib/" srcdir)
+          optimize: #t
+          debug: 'src             ; enable debugger introspection for library modules
+          static: #t              ; generate static compilation artifacts; required!
+         ;; prefix: "mukn/state-channels/
+          ;; build-deps: "build-deps" ; this value is the default
+          lib-build-spec))
+
+#+end_src
+
+* Make an ~exe.ss~ binary/library
+
+I think that's possible, both a ~main~ export and others. We'll see.
+
+** Wrap Main around the test
+First, wrap a main around the test.
+
+#+begin_src sh :session state-stage4 :results verbatim :wrap src diff
+  cd $GERBIL_LOADPATH;
+  git diff examples/mp1_1.ss | cat
+#+end_src
+
+#+begin_src diff
+
+diff --git a/examples/mp1_1.ss b/examples/mp1_1.ss
+index db08d82..d045fd0 100644
+--- a/examples/mp1_1.ss
++++ b/examples/mp1_1.ss
+@@ -4,74 +4,72 @@
+ (import ../src/apimon)
+ (import ./mp1)
+
+-;; Creating the proc snapshots
+-(define MP1 (micropay 'smith 10 'dupont 10 'durand 10))
+-(define MP2 (micropay 'smith 10 'dupont 10 'durand 10))
+-(define MP3 (micropay 'smith 10 'dupont 10 'durand 10))
++(define (main . args)
++  ;; Creating the proc snapshots
++  (define MP1 (micropay 'smith 10 'dupont 10 'durand 10))
++  (define MP2 (micropay 'smith 10 'dupont 10 'durand 10))
++  (define MP3 (micropay 'smith 10 'dupont 10 'durand 10))
+
+-;; Displaying the snapshots
+-(^ 'lst MP1)(cr)
+-(^ 'lst MP2)(cr)
+-(^ 'lst MP3)(cr)
++  ;; Displaying the snapshots
++  (^ 'lst MP1)(cr)
++  (^ 'lst MP2)(cr)
++  (^ 'lst MP3)(cr)
+
+-;; Creating the host
+-(define HOST1 (proch 'USER 'system
+-                     'UID "HOST1"))
+-(current-proch! HOST1)
++  ;; Creating the host
++  (define HOST1 (proch 'USER 'system
++                       'UID "HOST1"))
++  (current-proch! HOST1)
+
+-;; Creating the procs
+-(define PR1 (procl 'USER "smith"
+-                   'UID "PR1"
+-                   'SELF MP1))
+-(define PR2 (procl 'USER "dupont"
+-                   'UID "PR2"
+-                   'SELF MP2))
+-(define PR3 (procl 'USER "durand"
+-                   'UID "PR3"
+-                   'SELF MP3))
+-(net-enter PR1)
+-(net-enter PR2)
+-(net-enter PR3)
+-(define GR1 (proc-group+attach Void PR1 PR2 PR3))
+-(:= GR1 'UID "GR1")
+-(:= GR1 'USER "nobody")
+-(outraw "---\n")
+-(netlist 1)(cr)
+-
+-(define (lstp . STATES)
++  ;; Creating the procs
++  (define PR1 (procl 'USER "smith"
++                     'UID "PR1"
++                     'SELF MP1))
++  (define PR2 (procl 'USER "dupont"
++                     'UID "PR2"
++                     'SELF MP2))
++  (define PR3 (procl 'USER "durand"
++                     'UID "PR3"
++                     'SELF MP3))
++  (net-enter PR1)
++  (net-enter PR2)
++  (net-enter PR3)
++  (define GR1 (proc-group+attach Void PR1 PR2 PR3))
++  (:= GR1 'UID "GR1")
++  (:= GR1 'USER "nobody")
+   (outraw "---\n")
+-  (_lsp2 PR1)(cr)
+-  (_lsp2 PR2)(cr)
+-  (_lsp2 PR3)(cr)
+-  (if (not (empty? STATES))
+-  (begin
+\n")
+-    (^ 'lst MP1)(cr)
+-    (^ 'lst MP2)(cr)
+-    (^ 'lst MP3)(cr))))
++  (netlist 1)(cr)
+
+-;; Doing a micropayment
+-(current-proc! PR1)
+-(^ 'send (: PR1 'GROUP) 'transfer 'dupont 5)
+-(lstp)
++  (define (lstp . STATES)
++    (outraw "---\n")
++    (_lsp2 PR1)(cr)
++    (_lsp2 PR2)(cr)
++    (_lsp2 PR3)(cr)
++    (if (not (empty? STATES))
++        (begin
+\n")
++          (^ 'lst MP1)(cr)
++          (^ 'lst MP2)(cr)
++          (^ 'lst MP3)(cr))))
+
+-(^ 'step PR1)
+-(lstp)
++  ;; Doing a micropayment
++  (current-proc! PR1)
++  (^ 'send (: PR1 'GROUP) 'transfer 'dupont 5)
++  (lstp)
+
+-(^ 'step PR2)
+-(lstp 1)
++  (^ 'step PR1)
++  (lstp)
+
+-(^ 'step PR1)
+-(lstp 1)
++  (^ 'step PR2)
++  (lstp 1)
+
+-(^ 'step PR1)
+-(lstp)
++  (^ 'step PR1)
++  (lstp 1)
+
+-(^ 'step PR3)
+-(lstp 1)
++  (^ 'step PR1)
++  (lstp)
+
+-(^ 'step PR1)
+-(lstp)
++  (^ 'step PR3)
++  (lstp 1)
+
+-(define (main)
+-  Void)
++  (^ 'step PR1)
++  (lstp))
+#+end_src
+
+** Make the file =exe.ss=
+#+begin_src scheme :tangle ../../exe.ss
+  (module <mukn-example-mp1_1>
+    (import :mukn/state-channels/examples/mp1_1)
+    (export (rename: main main-mp1_1)))
+
+  (export main)
+  (import <mukn-example-mp1_1>)
+
+  (def main main-mp1_1)
+#+end_src
+
+* Build the executable!!
+
+#+begin_src scheme :noweb-ref bin-build-script
+      (def bin-build-spec '((static-exe: "exe")))
+
+
+      (def (make-bin)
+        (def libdir (path-expand "lib/" srcdir))
+        (add-load-path libdir)
+       ;; this action builds the static executables -- no debug introspection
+         (make srcdir: srcdir
+               bindir: (path-expand "bin/" srcdir)
+               libdir: libdir
+               verbose: 5
+               optimize: #f
+               debug: #f               ; no debug bloat for executables
+               static: #t              ; generate static compilation artifacts; required!
+               build-deps: "build-deps-bin" ; importantly, pick a file that differs from above
+               bin-build-spec))
+#+end_src
+
+* Try it in JS using the default gx-gambc
+
+#+begin_src scheme :noweb-ref js-bin-build-script
+    (def js-bin-build-spec
+      '((static-exe: "exe"
+                     "-verbose"
+                     "-target" "js" )))
+
+    (def (compile-static-exe mod opts settings)
+      (def srcpath (source-path mod ".ss" settings))
+      (def binpath (binary-path mod opts settings))
+      (def gsc-opts (compile-exe-gsc-opts opts))
+      (def gxc-opts
+        [invoke-gsc: #t
+                     output-file: binpath
+                     verbose: (settings-verbose>=? settings 9)
+                     debug: (settings-static-debug settings)
+                     (when/list gsc-opts [gsc-options: gsc-opts]) ...])
+
+      (message "... compile static js? exe " mod " -> " gxc-opts)
+      (gxc-compile mod gsc-opts (make-settings-static settings))
+      (message "... compile static exe " mod " -> " binpath)
+      (gxc#compile-static-exe srcpath gxc-opts))
+
+    (set! std/make#compile-static-exe compile-static-exe)
+    (def (make-js-bin)
+      (def libdir (path-expand "lib/" srcdir))
+      (add-load-path libdir)
+     ;; this action builds the static executables -- no debug introspection
+       (make srcdir: srcdir
+             bindir: (path-expand "js/bin/" srcdir)
+             libdir: libdir
+             verbose: 5
+             optimize: #f
+             debug: #f               ; no debug bloat for executables
+             static: #t              ; generate static compilation artifacts; required!
+             build-deps: "build-deps-js-bin" ; importantly, pick a file that differs from above
+             js-bin-build-spec))
+#+end_src
+
+* Testing and Conclusion
+
+It actually works very well for the normal target. The JS fails but I know that error from my https://github.com/drewc/gerbil.js attempts and think I can fix them.
+
+#+begin_src sh :session state-stage4 :results verbatim :wrap example
+  (echo "Running the C backend static exe" ; cd $STATE_CHAN_SRC)
+  ./bin/exe | (head -n 6; tail -n 3)
+  echo "---"; echo "And now trying the JS version"
+  ./js/bin/exe | (head -n 6;)
+
+#+end_src
+
+#+begin_example
+Running the C backend static exe
+---
+PID   NAME   USER    PEER  SELF
+0h_   HOST1  system  (_)   _
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m[39;49m
+out:
+---
+And now trying the JS version
+/home/drewc/me/MuKn/src/state-channels/js/bin/exe:58851
+_b = _s[_t-2].a[4];
+               ^
+
+TypeError: Cannot read properties of undefined (reading '4')
+    at _bb6_std_2f_generic_2f_dispatch_23_generic_2d_bind_21_ (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:58851:16)
+    at _trampoline (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:930:6)
+    at _call_start (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:1041:1)
+    at _program_start (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:1767:1)
+    at _all_modules_registered (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:1810:1)
+    at _module_register (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:1944:1)
+(/home/drewc/me/MuKn/src/state-channels/js/bin/exe:589280:1)
+    at Module._compile (node:internal/modules/cjs/loader:1159:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1213:10)
+    at Module.load (node:internal/modules/cjs/loader:1037:32)
+
+Node.js v18.12.0
+#+end_example
+
+That's actually a really nice error as I know how to track it down and a mostly possible solution.
+
+That means I can move on to stage 5. W00t!
+
+* Build.ss
+
+#+HEADER: :shebang #!/usr/bin/env gxi
+#+begin_src scheme :tangle ../../build.ss :noweb yes
+       (import :std/make)
+
+       ;; the source directory anchor
+       (def srcdir
+        (path-normalize (path-directory (this-source-file))))
+
+      (if (equal? srcdir (current-directory)) #t
+          (begin
+            (displayln "Going into " srcdir " for building state-channels"
+                       " from " (initial-current-directory))
+            (current-directory srcdir)))
+
+
+      <<library-build-script>>
+
+      <<bin-build-script>>
+
+      <<js-bin-build-script>>
+
+      (def (main . args)
+        (shell-command "./build gerbil")
+        (shell-command "backends/build filesocks_dummy")
+        (make-lib)
+        (make-bin)
+        (make-js-bin))
+
+#+end_src
+
