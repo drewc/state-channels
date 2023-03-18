@@ -2,15 +2,40 @@
 
 (C) MUKN  2022, 2023
 
+* Installation & Usage
+
+#+begin_src bash :results verbatim :wrap example :session README-shell
+  cd /tmp/
+  rm -rf state-channels
+  git clone https://github.com/drewc/state-channels.git
+
+  cd state-channels
+  export GERBIL_LOADPATH="$(pwd)/lib"
+  ./build.ss
+#+end_src
+
+Right now it does not do much as a gerbil exe, but there is a static binary! There will be a tonne more to come, that is for certain.
+
+#+begin_src bash :results verbatim :wrap example :session README-shell
+  ./bin/exe | (head -n6 ; tail -n3)
+#+end_src
+=>
+#+begin_example
+---
+PID   NAME   USER    PEER  SELF
+0h_   HOST1  system  (_)   _
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m[39;49m
+out:
+#+end_example
+
+* Github
 
 #+begin_src sh
   git@github.com:drewc/state-channels.git
 #+end_src
 
-
-
 * Emacs
-
 
 #+begin_src emacs-lisp
   (defun state-channels/create-new-log ()
