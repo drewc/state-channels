@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+myPath="$(cd `dirname $0`; pwd)"
+export STATE_CHAN_SRC=$(cd $myPath/.. ; pwd)
+export STATE_CHAN_BIN="$STATE_CHAN_SRC/bin"
+export PATH="$STATE_CHAN_BIN:$PATH"
+
+cd $STATE_CHAN_SRC; ./build.ss "$@"

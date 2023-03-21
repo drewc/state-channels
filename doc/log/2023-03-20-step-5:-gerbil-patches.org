@@ -1,0 +1,376 @@
+#+title: Step 5: Gerbil patches
+#+date: <2023-03-20 13:02>
+#+description: The (hopefully known) Gerbil -> JS patches
+#+filetags: Gerbil Gambit JavaScript Node
+
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  if [[ -z "$STATE_CHAN_SRC" ]]; then
+   export STATE_CHAN_SRC=$(cd ../.. && pwd);
+  fi;
+   # export GERBIL_LOADPATH=$STATE_CHAN_SRC;
+   cd $STATE_CHAN_SRC ;
+  echo \
+   Our starting  git: ; git log --pretty=oneline --abbrev-commit -2 | cat
+#+end_src
+=>
+#+begin_example
+> Our starting git:
+d6ded6e Make more shebangs use /usr/bin/env and update the README
+31098c1 Make `./src/` and examples/mp1[_1] into a static executable
+#+end_example
+
+* Current-State
+
+We've got a working binary. But the JavaScript attempt fails
+
+** Working binary
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  echo "The EXE:"
+  ./bin/exe | (head -n 6 | tail -n 3 ; tail -n3)
+#+end_src
+=>
+#+begin_example
+The EXE:
+---
+PID   NAME   USER    PEER  SELF
+0h_   HOST1  system  (_)   _
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m[39;49m
+out:
+#+end_example
+
+** Failing JS
+
+Because of the ongoing [[https://github.com/drewc/gerbil.js][Gerbil.js]] this is a fairly easy one to track down.
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  echo "The JS EXE:"
+  ./js/bin/exe | (head -n 6 | tail -n 3 ; tail -n3)
+#+end_src
+=>
+#+begin_example
+The JS EXE:
+/home/drewc/me/MuKn/src/state-channels/js/bin/exe:58851
+_b = _s[_t-2].a[4];
+               ^
+
+TypeError: Cannot read properties of undefined (reading '4')
+    at _bb6_std_2f_generic_2f_dispatch_23_generic_2d_bind_21_ (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:58851:16)
+    at _trampoline (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:930:6)
+    at _call_start (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:1041:1)
+    at _program_start (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:1767:1)
+    at _all_modules_registered (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:1810:1)
+    at _module_register (/home/drewc/me/MuKn/src/state-channels/js/bin/exe:1944:1)
+(/home/drewc/me/MuKn/src/state-channels/js/bin/exe:589280:1)
+    at Module._compile (node:internal/modules/cjs/loader:1159:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1213:10)
+    at Module.load (node:internal/modules/cjs/loader:1037:32)
+
+Node.js v18.12.0
+#+end_example
+
+* Gerbil.js, our Subtree, Summary of attempt
+
+That error is likely due to the Included gerbil->gambit source relies on something that exists in the C backend but not the Universal Runtime.
+
+It's often treating things as ~##structure?~ when they are not. In unsafe code. Yowza.
+
+It is in all fact because of this attempt I moved from the Gerbil.js construction over to this project as it's almost exactly how I'd continue.
+
+The idea here is that the C version of ~gxc~ is the one that compiles over to JavaScript. Currently the =Gerbil.js= ~gxi~ and therefore ~gxc~ run on Node.js and there is an error somewhere in the bootstrap.
+
+The idea is to make it so that the bootstrap is expanded properly from the code. Which the C version /can/ do. If given some attention.
+
+But at the same time =state-channels= is simpler code for the compiler. Which means that approach, though generic, is likely quicker to start with under state channels. Expand state channels AND have a dual runtime, and bob's your uncle.
+
+That's a really good thing for all parties involved.
+
+** Prepare to party! Gerbil Subtree
+
+We've got our own branch of Gerbil.
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  git remote add gerbil git@github.com:drewc/gerbil.git
+  git fetch gerbil
+  git stash;
+  git subtree add --prefix=gerbil gerbil master
+  git stash pop
+#+end_src
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  export GERBIL_HOME=$STATE_CHAN_SRC/gerbil
+  export GERBIL_BUILD_CORES=4
+#+end_src
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  $GERBIL_HOME/configure PACKAGE_VERSION=v0.16-MuKn-0
+  cd $GERBIL_HOME ; make ensure-gx-version ; cd ..
+  $GERBIL_HOME/src/build.sh
+#+end_src
+=>
+#+begin_example
+configure: creating ./config.status
+config.status: creating Makefile
+echo "(define (gerbil-version-string) \"v0.16-MuKn-0\")" \
+./src/gerbil/runtime/gx-version.scm ;
+...
+[*] Done
+#+end_example
+
+Does it have what we are looking for? Yes!
+#+begin_src bash :session state-stage5 :results verbatim :wrap example
+  find  $GERBIL_HOME/lib/static/* -exec grep -iH 'def.*generic.*bind' {} \;
+
+  # std__generic__dispatch.scm:  (define std/generic/dispatch#generic-bind!
+# gerbil/lib/static/std__generic__dispatch.scm:  (define std/generic/dispatch#generic-bind-method!
+#+end_src
+
+* Compile with new ~gxc~
+
+Let's make a ~gxc~...
+
+#+begin_src bash :shebang #!/usr/bin/env bash :tangle ../../bin/gxc
+  myPath="$(cd `dirname $0`; pwd)"
+  export STATE_CHAN_SRC=$(cd $myPath/.. ; pwd)
+  export GERBIL_HOME="$STATE_CHAN_SRC/gerbil"
+  $GERBIL_HOME/bin/gxc "$@"
+#+end_src
+
+... a ~gxi~ ...
+#+begin_src bash :shebang #!/usr/bin/env bash :tangle ../../bin/gxi
+  myPath="$(cd `dirname $0`; pwd)"
+  export STATE_CHAN_SRC=$(cd $myPath/.. ; pwd)
+  export GERBIL_HOME="$STATE_CHAN_SRC/gerbil"
+  $GERBIL_HOME/bin/gxi "$@"
+#+end_src
+
+... and a ~build-state-on-gerbil~, all inside =./bin=.
+
+#+begin_src bash :shebang #!/usr/bin/env bash :tangle ../../bin/build-state-on-gerbil
+  myPath="$(cd `dirname $0`; pwd)"
+  export STATE_CHAN_SRC=$(cd $myPath/.. ; pwd)
+  export STATE_CHAN_BIN="$STATE_CHAN_SRC/bin"
+  export PATH="$STATE_CHAN_BIN:$PATH"
+
+  cd $STATE_CHAN_SRC; ./build.ss "$@"
+#+end_src
+
+** Test the JS errors
+
+ The error tells us where to look:
+   : _bb6_std_2f_generic_2f_dispatch_23_generic_2d_bind
+
+  That means stc/generic/disapatch#generic-bind. When it's static that means it's:
+
+   : gerbil/lib/static/std__generic__dispatch.scm
+
+   We'll put a display to make sure.
+
+   #+begin_src scheme
+(define std/generic/dispatch#generic-bind!
+    lambda (_gen5000_ _signature5001_ _method5002_)
+      (display "GENERIC BIND\n")
+      if (procedure? _method5002_)
+   ... )
+   #+end_src
+
+   And?
+
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  echo "The JS EXE:"
+  ./js/bin/exe  2>/dev/null | (tail -n1)
+#+end_src
+=>
+#+begin_example
+The JS EXE:
+GENERIC BIND
+#+end_example
+
+Awesome, that means our thing's working.
+
+
+* Fixing =gx-gambc[*]= and friends
+
+We know from before how to 'fix' this here.
+
+#+begin_src sh
+   cp ~/me/MuKn/src/gerbil.js/gerbil/src/gerbil/runtime/gx-gambc* ./gerbil/src/gerbil/runtime
+#+end_src
+
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  $GERBIL_HOME/src/build.sh
+#+end_src
+
+Testing. The ~,q~ ends up passed to the repl after the error hits.
+
+That means the error is in the Gerbil/Gambit expansion, not the runtime!
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  echo "The gx-gambc JS EXE:"
+  ./js/bin/exe
+  ,q
+#+end_src
+=>
+#+begin_example
+The gx-gambc JS EXE:
+,*** ERROR IN exe# -- struct-instance-init!: too many arguments for struct #<generic #2>
+#+end_example
+
+We know that also. Time to move on to that substep.
+
+* Substitute =##vector-*= with =_gx#vector-*=
+
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  cd $GERBIL_HOME/src/gerbil/
+
+  StarSed() {
+      echo "s/##vector-$1/_gx#vector-$1/g"
+  }
+
+  find . -name "*.s*" -exec sed -i  "$(StarSed ref)" {} \;
+  find . -name "*.s*" -exec sed -i  "$(StarSed 'set!')" {} \;
+  find . -name "*.s*" -exec sed -i  "$(StarSed length)" {} \;
+  find . -name "*.s*" -exec sed -i  "$(StarSed '>list')" {} \;
+
+  git checkout runtime/build*.scm
+
+  cd -;
+#+end_src
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  $GERBIL_HOME/src/build.sh
+#+end_src
+
+That ends up taking a long time while doing nothing.
+
+A quick look, and:
+
+  #+begin_example
+  [*] Building gerbil stdlib
+
+  C-c C-c*** INTERRUPTED IN _gx#vector-ref
+  #+end_example
+
+
+So, somewhere is doing it over and over again perhaps? Let's restart.
+
+#+begin_src sh
+   git checkout compiler/*
+#+end_src
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  $GERBIL_HOME/src/build.sh
+#+end_src
+
+Wait ... wait wait wait wait lol. I think I `sed`'d to make it recursive FFS!
+
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+   cp ~/me/MuKn/src/gerbil.js/gerbil/src/gerbil/runtime/gx-gambc* $GERBIL_HOME/src/gerbil/runtime
+#+end_src
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  $GERBIL_HOME/src/build.sh
+#+end_src
+
+Ok that works. Let's try again.
+
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  cd $GERBIL_HOME/src/gerbil/
+
+  StarSed() {
+      echo "s/##vector-$1/_gx#vector-$1/g"
+  }
+
+  find . -name "*.s*" -not -name 'gx-gambc*' -exec sed -i  "$(StarSed ref)" {} \;
+  find . -name "*.s*" -not -name 'gx-gambc*'  -exec sed -i  "$(StarSed 'set!')" {} \;
+  find . -name "*.s*" -not -name 'gx-gambc*' -exec sed -i  "$(StarSed length)" {} \;
+  find . -name "*.s*" -not -name 'gx-gambc*' -exec sed -i  "$(StarSed '>list')" {} \;
+
+  git checkout runtime/build*.scm
+
+  cd -;
+#+end_src
+
+Now?
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  time $GERBIL_HOME/src/build.sh
+#+end_src
+=>
+#+begin_example
+[*] Done
+
+real	15m47.857s
+user	16m37.286s
+sys	2m11.983s
+#+end_example
+
+And?
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  ./bin/build-state-on-gerbil
+#+end_src
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  echo "The gx-gambc JS EXE:"
+  ./js/bin/exe | (head -n6 | tail -n3 ; tail -n3)
+
+#+end_src
+=>
+#+begin_example
+The gx-gambc JS EXE:
+---
+PID   NAME   USER    PEER  SELF
+0h_   HOST1  system  (_)   _
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m[39;49m
+out:
+#+end_example
+
+Yeah!!!
+
+* Conclusion
+
+It actually really works!
+
+#+begin_src sh :session state-stage5 :results verbatim :wrap example
+  echo "The gx-gambc JS exe: " $(head -n1 ./js/bin/exe)
+  ./js/bin/exe | tee /tmp/js-exe.log | (head -n6 | tail -n3 ; tail -n3)
+  echo "----"
+  echo "Now the normal C exe:"
+  ./bin/exe | tee /tmp/C-exe.log | (head -n6 | tail -n3 ; tail -n3)
+  echo "----"
+  echo "Do they differ?"
+
+  diff /tmp/C-exe.log /tmp/js-exe.log && echo "NOPE! YAY!" || echo "YES"
+#+end_src
+=>
+#+begin_example
+
+! /usr/bin/env node
+---
+PID   NAME   USER    PEER  SELF
+0h_   HOST1  system  (_)   _
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m[39;49m
+out:
+----
+Now the normal C exe:
+---
+PID   NAME   USER    PEER  SELF
+0h_   HOST1  system  (_)   _
+rl:
+transfer PR1=>GR1 (dupont 5) ([31;49mS[39;49m smith durand)[31;49m[39;49m
+out:
+----
+Do they differ?
+sh-5.1$ NOPE! YAY!
+#+end_example
+
+Time to commit and try a web deployment out!
