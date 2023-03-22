@@ -1,0 +1,213 @@
+#+title: Step 6: HTML and Browser time
+#+date: <2023-03-21 14:39>
+#+description: Time to test in the browser.
+#+filetags: HTML Browser JavaScript Gerbil Gambit MuKn
+
+#+begin_src sh :session state-stage6 :results verbatim :wrap example
+  if [[ -z "$STATE_CHAN_HOME" ]]; then
+   export STATE_CHAN_HOME=$(cd ../.. && pwd);
+   export GERBIL_LOADPATH=$STATE_CHAN_HOME;
+   export GERBIL_HOME=$STATE_CHAN_HOME/gerbil
+   export GERBIL_BUILD_CORES=4
+  fi;
+   cd $STATE_CHAN_HOME ; echo \
+   Our starting git: ; git log --pretty=oneline --abbrev-commit -2 | tee /dev/null
+#+end_src
+=>
+#+begin_example
+
+> > > > sh-5.1$ > Our starting git:
+785b7bbd Add the ./bin/gxi and ./bin/gxc bash scripts
+f8a7889d The Gerbil patches: doc/log/2023-03-20-step-5:-gerbil-patches.org
+#+end_example
+
+* Introduction
+
+We've got a working Node.js script. I want to run it in a browser!  Here we go.
+  - [ ] First redo the build and add a step.
+  - [ ] Then test.
+
+* The HTML build script
+
+#+begin_src scheme :noweb-ref html-bin-build-script
+  (def html-bin-build-spec
+    '((static-exe:
+       "exe" bin: "exe.html.stripped"
+       "-target" "js")))
+
+  (def (make-html-bin)
+    (def libdir (path-expand "lib/" srcdir))
+    (add-load-path libdir)
+   ;; this action builds the static executables -- no debug introspection
+     (make srcdir: srcdir
+           bindir: (path-expand "html" srcdir)
+           libdir: libdir
+           verbose: 10
+           optimize: #f
+           debug: #f               ; no debug bloat for executables
+           static: #t              ; generate static compilation artifacts; required!
+           build-deps: "build-deps-html-bin" ; importantly, pick a file that differs from above
+           html-bin-build-spec))
+#+end_src
+
+
+* Build.ss
+
+#+HEADER: :shebang #!/usr/bin/env gxi
+#+begin_src scheme :tangle ../../build.ss :noweb yes
+   (import :std/make)
+
+   ;; the source directory anchor
+   (def srcdir
+    (path-normalize (path-directory (this-source-file))))
+
+  (if (equal? srcdir (current-directory)) #t
+      (begin
+        (displayln "Going into " srcdir " for building state-channels"
+                   " from " (initial-current-directory))
+        (current-directory srcdir)))
+
+  <<library-build-script>>
+
+  <<bin-build-script>>
+
+  <<js-bin-build-script>>
+
+  <<html-bin-build-script>>
+
+  (def (main . args)
+    (match args
+      (["copy-gerbil-state-src"]
+       (shell-command "./build gerbil"))
+      (["copy-filesocks_dummy"]
+       (shell-command "backends/build filesocks_dummy"))
+      (["lib"] (make-lib))
+      (["bin"] (make-bin))
+      (["node"] (make-js-bin))
+      (["browser"] (make-html-bin))
+      ([]
+       (map main
+            ["copy-gerbil-state-src"
+             "copy-filesocks_dummy"
+             "lib" "bin" "node" "browser"]))))
+#+end_src
+
+
+* The =./bin/make= script
+
+Really just sets the path.
+
+
+#+begin_src bash :shebang #!/usr/bin/env bash :tangle ../../bin/make
+  export STATE_CHAN_BIN="$(cd `dirname $0`; pwd)"
+  export STATE_CHAN_SRC=$(cd $STATE_CHAN_BIN/.. ; pwd)
+
+  VALID_ARGS=$(getopt -o h:f: --long help -- "$@")
+if [[ $? -ne 0 ]]; then
+    exit 1;
+fi
+
+  export PATH="$STATE_CHAN_BIN:$PATH"
+
+  cd $STATE_CHAN_SRC; ./build.ss "$@"
+#+end_src
+
+
+* Existing Build scripts
+
+#+begin_src scheme :noweb-ref library-build-script
+    ;; the library module build specification
+    (def lib-build-spec '("src/socks" "examples/mp1" "examples/mp1_1" "exe"))
+    (let src ((fs (directory-files "src")))
+      ;; (displayln "Have " (length fs) " files in src")
+      (if (not (null? fs))
+        (let ((f (car fs)))
+          (displayln "f:" f (equal? f "clish_prg.ss") )
+          (if (and (equal? (path-extension f) ".ss")
+                   (not (equal? f "clish.ss"))
+                   (not (equal? f "scm2js.ss"))
+                   (not (equal? f "clish_prg.ss")))
+             (set! lib-build-spec
+                     (cons (path-expand (path-strip-extension f)
+                                        "src/")
+                           lib-build-spec)))
+                   (src (cdr fs)))))
+
+
+    (def (make-lib)
+      ;; (displayln "Making Library from:" lib-build-spec)
+    (make srcdir: srcdir
+          bindir: srcdir
+          libdir: (path-expand "lib/" srcdir)
+          optimize: #t
+          debug: 'src             ; enable debugger introspection for library modules
+          static: #t              ; generate static compilation artifacts; required!
+         ;; prefix: "mukn/state-channels/
+          ;; build-deps: "build-deps" ; this value is the default
+          lib-build-spec))
+
+#+end_src
+
+#+begin_src scheme :noweb-ref bin-build-script
+      (def bin-build-spec '((static-exe: "exe")))
+
+
+      (def (make-bin)
+        (def libdir (path-expand "lib/" srcdir))
+        (add-load-path libdir)
+       ;; this action builds the static executables -- no debug introspection
+         (make srcdir: srcdir
+               bindir: (path-expand "bin/" srcdir)
+               libdir: libdir
+               verbose: 10
+               optimize: #f
+               debug: #f               ; no debug bloat for executables
+               static: #t              ; generate static compilation artifacts; required!
+               build-deps: "build-deps-bin" ; importantly, pick a file that differs from above
+               bin-build-spec))
+#+end_src
+
+#+begin_src scheme :noweb-ref js-bin-build-script
+    (def js-bin-build-spec
+      '((static-exe: "exe"
+                     ; "-verbose"
+                     "-target" "js" )))
+
+    (def (compile-static-exe mod opts settings)
+      (def srcpath (source-path mod ".ss" settings))
+      (def binpath (binary-path mod opts settings))
+      (def gsc-opts (compile-exe-gsc-opts opts))
+      (def gxc-opts
+        [invoke-gsc: #t
+                     output-file: binpath
+                     verbose: (settings-verbose>=? settings 9)
+                     debug: (settings-static-debug settings)
+                     (when/list gsc-opts [gsc-options: gsc-opts]) ...])
+
+      (message "... compile static js? exe " mod " -> " gxc-opts)
+      (gxc-compile mod gsc-opts (make-settings-static settings))
+      (message "... compile static exe " mod " -> " binpath)
+      (gxc#compile-static-exe srcpath gxc-opts))
+
+    (set! std/make#compile-static-exe compile-static-exe)
+    (def (make-js-bin)
+      (def libdir (path-expand "lib/" srcdir))
+      (add-load-path libdir)
+     ;; this action builds the static executables -- no debug introspection
+       (make srcdir: srcdir
+             bindir: (path-expand "js/bin/" srcdir)
+             libdir: libdir
+             verbose: 5
+             optimize: #f
+             debug: #f               ; no debug bloat for executables
+             static: #t              ; generate static compilation artifacts; required!
+             build-deps: "build-deps-js-bin" ; importantly, pick a file that differs from above
+             js-bin-build-spec))
+#+end_src
+
+
+* Conclusion
+
+It works! When opening that file there is a dump to the javascript console. Brilliant.
+
+Time to create pullable patches and even things out.

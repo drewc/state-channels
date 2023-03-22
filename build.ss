@@ -11,7 +11,6 @@
                  " from " (initial-current-directory))
       (current-directory srcdir)))
 
-
 ;; the library module build specification
 (def lib-build-spec '("src/socks" "examples/mp1" "examples/mp1_1" "exe"))
 (let src ((fs (directory-files "src")))
@@ -53,7 +52,7 @@
    (make srcdir: srcdir
          bindir: (path-expand "bin/" srcdir)
          libdir: libdir
-         verbose: 5
+         verbose: 10
          optimize: #f
          debug: #f               ; no debug bloat for executables
          static: #t              ; generate static compilation artifacts; required!
@@ -62,7 +61,7 @@
 
 (def js-bin-build-spec
   '((static-exe: "exe"
-                 "-verbose"
+                 ; "-verbose"
                  "-target" "js" )))
 
 (def (compile-static-exe mod opts settings)
@@ -96,9 +95,37 @@
          build-deps: "build-deps-js-bin" ; importantly, pick a file that differs from above
          js-bin-build-spec))
 
+(def html-bin-build-spec
+  '((static-exe:
+     "exe" bin: "exe.html.stripped"
+     "-target" "js")))
+
+(def (make-html-bin)
+  (def libdir (path-expand "lib/" srcdir))
+  (add-load-path libdir)
+ ;; this action builds the static executables -- no debug introspection
+   (make srcdir: srcdir
+         bindir: (path-expand "html" srcdir)
+         libdir: libdir
+         verbose: 10
+         optimize: #f
+         debug: #f               ; no debug bloat for executables
+         static: #t              ; generate static compilation artifacts; required!
+         build-deps: "build-deps-html-bin" ; importantly, pick a file that differs from above
+         html-bin-build-spec))
+
 (def (main . args)
-  (shell-command "./build gerbil")
-  (shell-command "backends/build filesocks_dummy")
-  (make-lib)
-  (make-bin)
-  (make-js-bin))
+  (match args
+    (["copy-gerbil-state-src"]
+     (shell-command "./build gerbil"))
+    (["copy-filesocks_dummy"]
+     (shell-command "backends/build filesocks_dummy"))
+    (["lib"] (make-lib))
+    (["bin"] (make-bin))
+    (["node"] (make-js-bin))
+    (["browser"] (make-html-bin))
+    ([]
+     (map main
+          ["copy-gerbil-state-src"
+           "copy-filesocks_dummy"
+           "lib" "bin" "node" "browser"]))))
