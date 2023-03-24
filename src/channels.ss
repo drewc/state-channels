@@ -60,7 +60,7 @@
 
 (define (gaddr NPATH PROCID)
   (if (number? PROCID)
-    (set! PROCID (string PROCID)))
+    (set! PROCID (string2 PROCID)))
   (if (or (specified? (gaddr-host NPATH)) (not (string? PROCID)))
     (error "gaddr " NPATH " " PROCID))
   (string+ NPATH ":" PROCID))
@@ -109,7 +109,7 @@
   (define PATH Void)
   (define (hostpath0)
     (if (== HOST "00")
-      (string _PORT0)
+      (string2 _PORT0)
       (string+ "./" HOST)))
   (define (hostpath1 L)
     (set! L (list->npath (map (=> (S)
@@ -356,7 +356,7 @@
 
 (define (chmsg-oob FROM TO _FROM _TO)
   (define RES (string+ FROM ";" TO ";" _FROM ";" _TO))
-  (string+ (string (string-length RES)) "#" RES))
+  (string+ (string2 (string-length RES)) "#" RES))
 
 (define (rawmsg->chmsg STR)
   (define L (string-split STR #\#))
@@ -572,14 +572,14 @@
   RES)
 
 (define (gpath-unreachable? FROM TO)
-  (outraw* TO " " (gaddr-proxied? TO) " " (gaddr-npath TO) " " _PHMACHINE_GADDR "\n")
+ ;(outraw* TO " " (gaddr-proxied? TO) " " (gaddr-npath TO) " " _PHMACHINE_GADDR "\n")
   (and (gaddr-proxied? TO)
        (not (== (gaddr-npath TO) _PHMACHINE_GADDR))))
 
 (let* ((L (conf-get2 "PROXIED"))) ;; Read PROXIED
   (if (not (pair? L))
     (set! L `(,L)))
-  (set! L (map (=> (A) (gaddr-normalize (gaddr-expand (string+ (string A) ":00")))) L))
+  (set! L (map (=> (A) (gaddr-normalize (gaddr-expand (string+ (string2 A) ":00")))) L))
   (for-each gaddr-proxied! L))
 
 (define (channel-write CHAN MSG . OPT) ;; => Void ; adds FROM, TO, NONCE, ASK, SYNC]
@@ -808,7 +808,7 @@
  ;(set! IDLEH (: PROC 'IDLEH)) ;; TODO: manage IDLEH by means of (select) & nonblocking socks
   (while True
     (set! MSG (channel-read SRV))
-    (if CHAN_LOG
+    (if (!= CHAN_LOG 0)
       (chlog2 MSG ">  "))
     (if (and (chmsg? MSG) ;; FIXME: temporary fix ; remove this asap
              (not (procph0-reroute PROC MSG)))

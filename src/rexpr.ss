@@ -51,7 +51,7 @@
   (if (!= (string-ref S 0) (char "@"))
     (set! S (string-add "@" S)))
   (if (not (empty? OPT))
-    (set! S (string-add S ":" (string (car OPT)))))
+    (set! S (string-add S ":" (string2 (car OPT)))))
   (sy S))
 
 ;; Types
@@ -164,7 +164,7 @@
     (rexpr-set! TYPE 'INSTNO (+ INSTNO 1)))) ;; TODO: combine that with (make-id)
   (if (and (not (nil? INSTNO))
            (unspecified? (rexpr-get RES 'ID)))
-    (rexpr-set! RES 'ID (sy (string+ (string (rexpr-get TYPE 'ID)) "@" (string INSTNO)))))
+    (rexpr-set! RES 'ID (sy (string+ (string2 (rexpr-get TYPE 'ID)) "@" (string2 INSTNO)))))
   RES)
 
 (define (rexpr? O)
@@ -365,7 +365,8 @@
 (define (rexpr-parse S . OPT) ;; links to when they exists, or creates folded entries for IDed rexprs
   Nil)
 
-(define >> rexpr-serialize)
+(define (>> O . OPT)
+  (apply rexpr-serialize (cons O OPT)))
 
 ;; Pretty-printing
 ;; TODO: add loop protection
@@ -453,7 +454,7 @@
     ((== TY 'sy)
      (sy VAL))
     ((== TY 'str)
-     (string VAL))
+     (string2 VAL))
     ((== TY 'var)
      (eval (sy VAL) (interaction-environment)))
     (else
@@ -472,10 +473,14 @@
 
 (define (mcallv F . PARM)
   (set! PARM (mvparms F PARM))
-  (apply mcall `(,F . ,PARM)))
+  (apply mcall (cons F PARM)))
 
-(define ^ mcall) ;; TODO: improve this ugly thing
-(define ^? mcallv)
+;(define ^ mcall) ;; TODO: improve this ugly thing
+;(define ^? mcallv)
+(define-macro (^ . PARM) ;; NOTE: temporary s$%t to enable compiling to enable lifting to Gambit ; remove this asap.
+  `(mcall . ,PARM)) ;; TODO: improve this ugly thing
+(define-macro (^? . PARM)
+  `(mcallv ,(car PARM) . ,(cdr PARM)))
 
 ;; CSV-like files
 (define (csv-read FNAME TY SLOT)
@@ -513,7 +518,7 @@
            (cond ((== TY 'num)
                   (number VAL))
                  ((== TY 'str)
-                  (string VAL))
+                  (string2 VAL))
                  (else
                   VAL)))
          (define VARS (map (=> (X) (var X)) SLOT))
@@ -530,7 +535,7 @@
     (cond ((unspecified? X)
            "_")
           ((number? X)
-           (string X))
+           (string2 X))
           ((string? X)
            X)
           (else

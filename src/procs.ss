@@ -66,7 +66,7 @@
            "m")
           (else
            (error "_procId.postfix"))))
-  (define ID (string (: PROC 'ID)))
+  (define ID (string2 (: PROC 'ID)))
   (string+ (car (list-last (string-split ID #\@))) (postfix)))
 
 (define (_getProc PID)
@@ -222,7 +222,8 @@
 
 (define tproceth Void)
 (define (proceth? PROC)
-  (== (typeof PROC) tproceth))
+  (and (specified? PROC)             ;; FIXME: find a general solution such as when tprocxyz==Void, we don't
+       (== (typeof PROC) tproceth))) ;;        have (procxyz? Void)=>True ; (procxyz? Void) should always be False
 
 ;; (define)s for calls
 (define tcall Void)

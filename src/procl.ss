@@ -34,7 +34,7 @@
 
 ;; Call
 (define (fname-isret? F)
-  (set! F (string F))
+  (set! F (string2 F))
   (let* ((LF (string-length F))
          (LP (string-length "/return")))
     (and (> LF LP)
@@ -78,8 +78,9 @@
             (:= CALL 'PARM (cdr (mvparms (: CALL 'FUNC)
                                          (cons (: PR 'SELF)
                                                (: CALL 'PARM)))))
-            (apply ^? `(,FNAME ,SELF . (,CALL)))))
-        (apply ^? `(,FNAME ,SELF . ,PARM))))
+           ;(apply mcallv `(,FNAME ,SELF . (,CALL))))) ;; ^?
+            (apply mcallv (cons FNAME (cons SELF (cons CALL '())))))) ;; ^?
+        (apply mcallv (cons FNAME (cons SELF PARM))))) ;; ^?
     (call-switchin SELF '_switchout)
     (call-switchin SELF '_leave)
     RES)))
@@ -101,7 +102,7 @@
                              `(,(: CALL 'FUNC) ,(: CALL 'INNB)))
                            (: MASTER 'IN!))))
     (for-each (=> (CALL)
-                (^ 'send (: PROC 'GROUP) (sy (string+ (string (car CALL)) "/return")) (cadr CALL)))
+                (^ 'send (: PROC 'GROUP) (sy (string+ (string2 (car CALL)) "/return")) (cadr CALL)))
               RL0)))))
 
 ;; Proc send
@@ -122,7 +123,7 @@
 (method! tproc 'send (=> (PROC FNAME . PARM) ;; NOTE: PROC is the _target_ (i.e., the TO)
   (let* ((FROM (current-proc))
          (STATE Void))
-    (apply proc-send0 `(,PROC ,FNAME . ,PARM))
+    (apply proc-send0 (cons PROC (cons FNAME PARM)))
     (set! STATE (: FROM 'STATE))
     (if (not (or (== STATE 'Idle) (== STATE 'Active)))
       (error "proc::send=> " STATE))
@@ -156,7 +157,7 @@
   (current-proc! PROC)
   (sender-proc! SPROC)
   (current-call! MSG)
-  (set! RES (apply ^ `(call ,PROC ,(: MSG 'FUNC) . ,(: MSG 'PARM))))
+  (set! RES (apply mcall (cons 'call (cons PROC (cons (: MSG 'FUNC) (: MSG 'PARM)))))) ;; ^
   (:= MSG 'RESULT RES)
   (current-proc! OPROC)
   (sender-proc! Nil)
@@ -214,7 +215,7 @@
                     (^ 'schedule PROC))))
   (if RES
   (begin
-   ;(outraw (string+ "Proc " (: PROC 'UID) " fired[" (string RES) "]\n"))
+   ;(outraw (string+ "Proc " (: PROC 'UID) " fired[" (string2 RES) "]\n"))
    ;(errlog PROC)
     (noop)
   ))
