@@ -85,6 +85,6 @@ There are 3 different forms of what was built.
 #+begin_src emacs-lisp
   (defun state-channels/create-new-log ()
     (interactive)
-    (let ((org-static-blog-drafts-directory "~/me/MuKn/src/state-channels/doc/log"))
+    (let ((org-static-blog-drafts-directory "~/me/MuKn/src/state-channels/journal"))
       (org-static-blog-create-new-draft)))
 #+end_src

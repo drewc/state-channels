@@ -1,0 +1,1148 @@
+#+title: Mockup UI in browser: R&D
+#+date: <2023-03-24 11:20>
+#+description: Starting a JS and HTML interface for state-channels
+#+filetags: Gerbil JavaScript HTML State-Channels
+
+
+* Requirements
+
+"We need an mockup interface so that clients can develop their own on top of the SDK we build"
+
+  - SDK :: A JavaScript object which acts as the controller
+  - UI :: A website which interacts with the controller.
+
+In *MVC* terms:
+
+  - Model :: State Channels
+  - View :: The UI
+  - Controller :: The JavaScript SDK
+
+The *Model* is taken care of. It's the *View* that our primary concern this time around. The *Controller* is the ultimate goal, and product for release. It is the meeting of the *Model* and the *View* by which the *Controller* evolves.
+
+Time to make a *View*
+
+* Pull and Merge the new upstream
+
+This is where git is always fun. We have different commits in the main branch over the upstream branch and repo. But they end up with the same diffs and patches, as it were.
+
+Git can usually handle things fine. We'll see.
+
+#+begin_src bash :session mock-ui-shell :results verbatim
+  cd /tmp/
+   if [[ -d state-channels ]]; then
+       mv state-channels $(mktemp -d state-channels-XXXX)
+   fi
+  git clone -q git@github.com:drewc/state-channels.git
+  cd state-channels
+  git remote add mukn git@github.com:MuKnSys/state-channels.git
+  git fetch -q mukn && git checkout upstream
+  git branch -u mukn/main upstream
+#+end_src
+: branch 'upstream' set up to track 'origin/upstream'.
+: Switched to a new branch 'upstream'
+: branch 'upstream' set up to track 'mukn/main'.
+
+#+begin_src bash :session mock-ui-shell :results verbatim
+  git pull -q
+  git checkout main
+  git merge -Xtheirs upstream
+  git push
+#+end_src
+
+#+begin_src bash :session mock-ui-shell :results verbatim
+  cd ~/me/MuKn/src/state-channels
+  git pull origin main
+  git branch -u origin/main
+  git push --mirror
+#+end_src
+
+* Build and Test
+
+It does not build.
+#+begin_example
+,*** ERROR IN gx#core-expand-ref% -- Syntax Error
+,*** ERROR IN "src/rexpr.ss"@482.2
+--- Syntax Error: Reference to unbound identifier
+... form:   (%#ref define-macro)
+... detail: define-macro at "src/rexpr.ss"@482.2
+#+end_example
+
+There is no =define-macro= in gerbil. While such syntax does exist in Gambit, it does not make any sense to have it in gerbil as it will mess with identifiers.
+
+The code in question?
+
+#+begin_src scheme
+   ;(define ^ mcall) ;; TODO: improve this ugly thing
+  ;(define ^? mcallv)
+  (define-macro (^ . PARM) ;; NOTE: temporary s$%t to enable compiling to enable lifting to Gambit ; remove this asap.
+    `(mcall . ,PARM)) ;; TODO: improve this ugly thing
+  (define-macro (^? . PARM)
+    `(mcallv ,(car PARM) . ,(cdr PARM)))
+#+end_src
+
+  Well that makes little sense. The symbol names will not be right. In Gerbil and Gambit defining a symbol in a module adds a namespace prefix for being in the symbol table. The macro eventually calls *mcall*. That symbol is named, in the symbol table, as *mukn/src/rexpr#mcall* when this is compiled.
+
+  Reversing those comments make it work again.
+
+* Call from JS to Gambit runtime
+
+Looking at =mp1_1.ss= it starts with this:
+
+#+begin_src scheme
+    ;; Creating the proc snapshots
+  (define MP1 (micropay 'smith 10 'dupont 10 'durand 10))
+  (define MP2 (micropay 'smith 10 'dupont 10 'durand 10))
+  (define MP3 (micropay 'smith 10 'dupont 10 'durand 10))
+  (define HOST1 Void)
+  (define PR1 Void)
+  (define PR2 Void)
+  (define PR3 Void)
+  (define GR1 Void)
+
+  (define (lstp . STATES)
+    (outraw "---\n")
+    (_lsp2 PR1)(cr)
+    (_lsp2 PR2)(cr)
+    (_lsp2 PR3)(cr)
+    (if (not (empty? STATES))
+      (begin
+        (outraw "=>\n")
+        (^ 'lst MP1)(cr)
+        (^ 'lst MP2)(cr)
+        (^ 'lst MP3)(cr))))
+
+  ;; Displaying the snapshots
+  (^ 'lst MP1)(cr)
+  (^ 'lst MP2)(cr)
+  (^ 'lst MP3)(cr)
+
+
+#+end_src
+
+  Ok! So what is a proc? According to the [[file:~/me/MuKn/src/state-channels/doc/MANUAL.txt::proc: the abstract class for all processes ;][MANUAL]]:
+
+   : 2) Main classes
+   : proc: the abstract class for all processes ;
+
+ Well, what is a process?
+
+  : In essence, a state channel is a process enabling the concurrent edition of a distributed object ;
+
+  Ok, and further:
+
+  :  So: a state channel is, in essence, a set of processes, bound by the RSM protocol, which forces their respective states to remain exact mirrors of one each other.
+
+  Ok, that somewhat helps. So what is a =micropayment=?
+
+#+begin_quote
+=> (micropay PUBKEY1 PUBKEY2 ... PUBKEY(N)): constructor ;
+ creates an instance of the micropayment class (i.e., a contract) in the chain, for a state channel involving N local state channel processes, impersonating the persons owning Ethereum accounts having PUBKEY1, PUBKEY2, ... PUBKEY(N), as their public keys, respectively ; this contract then has to be mapped in the local memory of each one of the participant processes, and from it, a group whose master is the contract's mapping has to be created ; this group then acts as the "local mapping" of the state channel ;
+#+end_quote
+
+Ok, then what do the numbers mean? The documentation seems out of date.
+
+That procedure comes from [[file:~/me/MuKn/src/state-channels/examples/mp1.ss::define (micropay . L][mp1.ss]].
+
+#+begin_src scheme
+  (define (micropay . L)
+  (let* ((ACCOUNT (rexpr '@rexpr '()))
+         (WITHDRAW (rexpr '@rexpr '()))
+         (MP (rexpr tmicropay `(STATE Init ACCOUNT ,ACCOUNT WITHDRAW ,WITHDRAW))))
+    (set! L (list-group L))
+    (for-each (=> (A)
+                (:= ACCOUNT (sy (car A)) (number (cadr A)))
+                (:= WITHDRAW (sy (car A)) 0)
+              )
+              L)
+    (^ 'start MP)
+    MP))
+#+end_src
+
+Ok, so without investigating further I'll assume that =list-group= is a =plist->reverse-alist-with-list-values=. So it creates an object of the rexpr type =tmicropay=?
+
+Let's try and make it into JavaScript. Here's a sketch.
+
+First, lets see exactly what JS says at the console.
+
+Adding a "tell me what you see" is fairly simple.
+
+#+begin_src scheme
+ (##inline-host-statement "
+  console.log('Mpay', @1@, @scm2host@(@1@));
+  window.GLO = @glo@" MP1)
+#+end_src
+
+Trying it out also quite simple.
+
+#+begin_src sh
+  ../bin/make lib && ../bin/make browser
+#+end_src
+
+Our =scm2host= allows us to see that a proc is just an alist.
+
+#+begin_src js
+  [
+  ":ACCOUNT",
+  [
+    [
+      ":TYPE",
+      [
+        [
+          ":TYPE",
+          "@type"
+        ],
+        [
+          ":INHERITS",
+          []
+        ],
+        [
+          ":ID",
+          "@rexpr"
+        ],
+        [
+          ":NAME",
+          "rexpr"
+        ],
+        [
+          ":INSTNO",
+          16
+        ],
+        [
+          ":SLOT",
+          [
+            ":TYPE",
+            ":ID"
+          ]
+        ],
+        [
+          ":METHOD",
+          [
+            null
+          ]
+        ],
+        [
+          ":SLOTTY",
+          [
+            [
+              ":TYPE",
+              [
+                "type"
+              ]
+            ],
+            [
+              ":ID",
+              [
+                "int"
+              ]
+            ]
+          ]
+        ]
+      ]
+    ],
+    [
+      ":ID",
+      "@rexpr@10"
+    ],
+    [
+      ":smith",
+      10
+    ],
+    [
+      ":dupont",
+      10
+    ],
+    [
+      ":durand",
+      10
+    ]
+  ]
+]
+#+end_src
+
+We've also added =@glo@=, which is the symbol table, to the window as =GLO=. That's so we can find out where our function is.
+
+#+begin_src js
+  Object.keys(GLO).filter(s => s.startsWith("mukn/state-channels/ex"))
+    => Array(3) [
+      "mukn/state-channels/examples/mp1#micropay", "mukn/state-channels/examples/mp1_1#main", "mukn/state-channels/examples/mp1#tmicropay"
+    ]
+
+#+end_src
+
+
+Now let's try a base event loop to see how we can interact in real time.
+
+#+begin_src scheme
+   (##inline-host-declaration "
+  window.StateChannels = { exit: false }")
+
+  (def (call-to-exit?)
+    (##inline-host-expression "@host2scm@(StateChannels.exit)"))
+
+  (def n 0)
+
+  (let lp ()
+    (let ((e? (call-to-exit?)))
+      (displayln "Call to exit? " (call-to-exit?) " " n)
+      (set! n (+ n 1))
+      (if e? (displayln "Exiting...")
+          (begin (##thread-sleep! 30)
+                 (lp)))))
+#+end_src
+
+That works so nice!
+
+Now the next phase in that example has a "method call"
+#+begin_src scheme
+  ;; Displaying the snapshots
+  (^ 'lst MP1)(cr)
+  (^ 'lst MP2)(cr)
+  (^ 'lst MP3)(cr)
+#+end_src
+
+In JavaScript we'll simplify with a proxy.
+
+First, a bridge. Javascript has strings.
+
+#+begin_src scheme
+   (def (call-method-using-string str obj . args)
+      (apply mcall (string->symbol str) obj args))
+
+  (##inline-host-statement "
+   window.StateChannels.cr = () => @async_call@(false, false, @2@, []);
+    window.StateChannels.mcall = (meth, obj, ...args) => {
+      const xargs = @host2scm@(args);
+      return @async_call@(false, false, @1@,[@host2scm@(meth), obj, ...xargs])
+    };" call-method-using-string)
+#+end_src
+
+Let's pass one of the =MP='s to try it at the console.
+
+#+begin_src scheme
+  (##inline-host-statement
+   "window.StateChannels.objs =
+     { MP1: @1@ }"
+   MP1)
+#+end_src
+#+begin_src js
+     > let MP1 = StateChannels.objs.MP1,
+           mcall = StateChannels.mcall,
+           cr = StateChannels.cr;
+     => undefined
+     > mcall("lst", MP1); cr()
+       smith : 10
+       dupont : 10
+       durand : 10
+     => Promise { <state>: "fulfilled", <value>: undefined }
+#+end_src
+
+Well that's brilliant. I love the newish Gambit JS backend and runtime!
+
+
+Now the entire idea is :
+
+#+begin_quote
+A JS Object that is the controller to run state channels "in the browser"
+#+end_quote
+
+The object system appears to have methods and slots. Given that javascript doesn't, and I don't think that they are named the same thing on the scheme side and that does not matter actually ... so ...
+
+If there's a slot we return that, otherwise the method, otherwise void, which in js means undefined.
+
+#+begin_src scheme
+  (def (property-value obj name)
+    (def sym (if (symbol? name) name (string->symbol name))
+    (def val (: obj name))
+    (if (Undefined? val) (method (typeof obj) sym))
+  (##inline-host-statement
+   "window.StateChannels.propertyValue = (obj, name) =>
+     @async_call@(true, false, @1@, [obj, @host2scm@(name)])"
+   property-value)
+
+#+end_src
+
+Ok, while that's fun, it does not quite follow what we need.
+
+To recreate the scheme in javascript is the start. Then some html forms to work it out is the variable passing sense.
+
+* JavaScript Rexprs, =new Micropay(...)= to start
+
+The example starts with this.
+
+#+begin_src scheme
+    ;; Creating the proc snapshots
+  (define MP1 (micropay 'smith 10 'dupont 10 'durand 10))
+  (define MP2 (micropay 'smith 10 'dupont 10 'durand 10))
+  (define MP3 (micropay 'smith 10 'dupont 10 'durand 10))
+#+end_src
+
+We are going to change it into this:
+
+#+begin_src js
+    // ;; Creating the proc snapshots
+  const MP1 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]),
+        MP2 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]),
+        MP3 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]);
+#+end_src
+
+It seems we need to double wrap in foreign to come out the other end as-is. Not sure if that is the right approach.
+
+#+begin_src scheme :noweb yes
+  (begin
+    (def (makeMicropay accounts)
+      (def args '())
+      (vector-for-each
+       (lambda (v)
+         (match v (#(str n)
+                   (set! args (cons* n (string->symbol str) args)))))
+       accounts)
+      (set! args (reverse args))
+      ;;(displayln "Have Accounts:" args)
+
+      (let* ((mp (apply micropay args))
+             (f  (##inline-host-expression "@host2foreign@(@1@)" mp)))
+        ;; (displayln "have mp:" mp f)
+        (##inline-host-expression "@host2foreign@(@1@)" f)))
+
+    (##inline-host-statement "
+    window.StateChannels.makeMicropay = @scm2host@(@1@) "
+                             makeMicropay))
+#+end_src
+
+So we'll make a JS object with that.
+
+#+begin_src js
+
+  function Micropay(...accounts) {
+   const { makeMicropay } = StateChannels;
+    makeMicropay(accounts).then(mp => { this.$scm = mp });
+    return this;
+  }
+
+  Micropay.prototype.lst = function () {
+   const { mcall } = StateChannels;
+    mcall("lst", this.$scm)
+  }
+#+end_src
+
+And for now insert it into a .scm file
+
+#+begin_src scheme :noweb yes
+  (##inline-host-statement
+  #<<EOF
+  <<js-micropay>>
+  window.Micropay = Micropay
+  EOF
+  )
+#+end_src
+
+It looks so beautiful!!
+
+#+begin_src js
+  $ let { Micropay, cr } = StateChannels
+  $ MP1 = new Micropay(["asd", 10], ["dunlop",10], ["mrbungle", 10])
+  Object { "$scm": {…} }
+
+  $ MP1.lst() ; cr() ;
+  asd : 10
+  dunlop : 10
+  mrbungle : 10
+#+end_src
+
+* Make a Generic Rexpr object
+
+We started with calling =micropay=.
+
+#+begin_src scheme
+  (define (micropay . L)
+  (let* ((ACCOUNT (rexpr '@rexpr '()))
+         (WITHDRAW (rexpr '@rexpr '()))
+         (MP (rexpr tmicropay `(STATE Init ACCOUNT ,ACCOUNT WITHDRAW ,WITHDRAW))))
+    (set! L (list-group L))
+    (for-each (=> (A)
+                (:= ACCOUNT (sy (car A)) (number (cadr A)))
+                (:= WITHDRAW (sy (car A)) 0)
+              )
+              L)
+    (^ 'start MP)
+    MP))
+#+end_src
+
+Looking at that it's fairly easy to see how =rexpr= is the contructor.
+
+So let's make one one in JavaScript! The double =@@= is needed as Gambit uses =@...@= as a template marker and it would be unbalanced otherwise
+
+#+begin_src js :noweb-ref Rexpr
+  function Rexpr (type = "@@rexpr", obj = {}) {
+    const { makeRexpr } = StateChannels ;
+    makeRexpr(type, Object.entries(obj)).then(r => { this.$scm = r })
+    return this;
+  };
+
+  globalThis.StateChannels.Rexpr = Rexpr
+#+end_src
+
+Now into the scheme side.
+
+We know from experience that to keep the value as-is we need to double wrap in foreign.
+
+#+begin_src scheme :noweb-ref doublewrap
+  (def (doublewrap obj)
+     (##inline-host-expression "@host2foreign@(@host2foreign@(@1@))" obj))
+#+end_src
+
+We'll make a rexpr
+
+#+begin_src scheme :noweb-ref makeRexpr
+  (begin ;; makeRexpr and the globalThis.StateChannels binding
+    (def (makeRexpr type vslots)
+      (def scm-type (if (string? type) (string->symbol type) type))
+      (def slots '())
+      (vector-for-each
+       (lambda (v)
+         (match v (#(n val)
+                   (set! slots (cons* val (string->symbol n) slots)))))
+       vslots)
+      (set! slots (reverse slots))
+      ;; (displayln "Slots: " slots)
+      (doublewrap (rexpr scm-type `(,@slots))))
+
+      (##inline-host-statement "
+     // alert('inline');
+    window.StateChannels.makeRexpr = @scm2host@(@1@) "
+                               makeRexpr))
+#+end_src
+
+Now a slot-value. It returns #!void, AKA /undefined/ when non existant.
+
+For some reason the async call returns ={ a: "string" }= when the value is a string. We doublewrap to get around that.
+
+#+begin_src scheme :noweb-ref slot-value
+  (begin
+    (def (slot-value obj name)
+      (def sym (if (symbol? name) name (string->symbol name)))
+      (def val (: obj sym))
+      ;; (displayln "This is the obj: " obj " and sym " sym )
+    #;(displayln "fudge? :"  val " and " (: obj sym)
+                " but" (##inline-host-expression
+                        "console.log('huh?',@1@, @scm2host@(@1@), '_y ', _stringp(@1@)) " val))
+      (if (not (unspecified? val)) (doublewrap val)))
+  (##inline-host-statement
+    "window.StateChannels.slotValue = (obj, name, scm = false) =>
+       @async_call@(true, false, @1@, [obj, @host2scm@(name)])
+          .then(r => { return scm ? r : @scm2host@(r); })"
+    slot-value))
+#+end_src
+
+#+begin_src scheme :noweb-ref slot-value
+  (begin
+  (def (slot-method? obj name)
+    (def sym (if (symbol? name) name (string->symbol name)))
+    (method (typeof obj) sym))
+  (##inline-host-statement
+   "window.StateChannels.hasMethod = (obj, name) =>
+     @async_call@(true, false, @1@, [obj, @host2scm@(name)])"
+   slot-method?))
+
+#+end_src
+
+We'll make a handler for a proxy and add it to the constructor.
+
+  - get() :: If the object does not have this property it is fetched from Scheme. This is always async. If scheme does not have it the async tries to get it from the initial prototype.
+  - set() :: If the object does not have this property we should attempt to set it in scheme.
+
+#+begin_src js :noweb-ref RexprP
+  function Rexpr (type = "@@rexpr", obj = {}) {
+    const { makeRexpr } = StateChannels ;
+    // console.log("Make Rexpr?", makeRexpr)
+    if (!type) {
+      this.$scm = obj
+    } else if (typeof type === 'object' && !(type instanceof RexprType)) {
+      this.$scm = type
+    } else {
+      makeRexpr(type, Object.entries(obj)).then(r => { this.$scm = r })
+    }
+    return this.proxify();
+  };
+
+  function RexprType(type) {
+    Object.assign(this, type);
+    return this;
+  }
+  const promiseProxy = (prom) => {
+    return new Proxy(() => prom, {
+      get: function(target, prop) {
+        var value = target()[prop];
+        return typeof value == 'function' ? value.bind(target()) : value;
+      },
+      apply: function(target, thisArg, argumentsList) {
+        return target().then(f => {
+          if (typeof f === 'function') {
+            return f(...argumentsList)
+          } else { return f }
+        })
+    }
+    })
+  };
+
+  const makeRexprHandler = (obj) => {
+     const proto = Object.getPrototypeOf(obj);
+    return {
+      getPrototypeOf(target) { return proto ; },
+      get(target, prop, rec) {
+       // console.log("target:", target)
+        if (Object.hasOwn(target, prop) || prop.startsWith('$')) {
+          console.warn("Accessing ", prop, " In", target)
+           return Reflect.get(...arguments);
+        } else {
+        return promiseProxy(StateChannels.slotValue(target.$scm, prop)
+          .then(val => typeof val !== "undefined" ? val :
+                StateChannels.hasMethod(target.$scm, prop)
+                .then(meth => {
+                  if (typeof meth === "undefined") {
+                    Reflect.get(proto, prop, rec);
+                  } else {
+                    return (...args) => StateChannels.mcall(prop, target.$scm, ...args);
+                  }
+                })
+               )
+                           )
+        }
+      }
+    }
+  }
+
+  const proxifyRexpr = (obj) => {
+    const handler = makeRexprHandler(obj);
+    const prox = new Proxy(obj, handler);
+    return prox;
+  }
+
+   Rexpr.prototype.proxify = function () {
+      return proxifyRexpr(this);
+   }
+
+
+  globalThis.StateChannels.Rexpr = Rexpr
+#+end_src
+
+That's really brillant. I now have proxies that unite our Scheme datastructures with our JS datastructures.
+
+There's just one more thing. If we don't want the value converted to the host, we can use =.$slot('name')=
+
+#+begin_src js :noweb-ref RexprP
+  Rexpr.prototype.$slot = function (id) {
+    return StateChannels.slotValue(this.$scm, id, true)
+  }
+#+end_src
+
+* Redo Micropay as inheritor
+
+Because Micropay does the scheme thing I've decided on a promise
+
+
+#+begin_src js :noweb-ref js-micropay
+  function Micropay(...accounts) {
+    const { makeMicropay , Rexpr } = StateChannels;
+    this.$proxy = Rexpr.call(this, false);
+    const self = this
+    this.$promise = makeMicropay(accounts).then(m => {
+      self.$scm = m
+      return true
+      }).catch((e) => { self.$error = e ; return false })
+    Object.setPrototypeOf(this, Object.create(this.$proxy))
+    return this
+  }
+  Micropay.prototype = Object.create(Rexpr.prototype);
+  Micropay.prototype.constructor = Micropay
+
+  globalThis.StateChannels.Micropay = Micropay;
+#+end_src
+
+Using that we'll try and recreate the mp1_1.ss
+
+* Re-create mp1_1.ss : Step one.
+
+Scheme
+#+begin_src scheme
+    ;; Creating the proc snapshots
+  (define MP1 (micropay 'smith 10 'dupont 10 'durand 10))
+  (define MP2 (micropay 'smith 10 'dupont 10 'durand 10))
+  (define MP3 (micropay 'smith 10 'dupont 10 'durand 10))
+#+end_src
+
+We are going to change it into this:
+
+#+begin_src js :noweb-ref mp1_1
+    // ;; Creating the proc snapshots
+  const MP1 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]),
+        MP2 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]),
+        MP3 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]);
+
+  console.log("Have MPS:", MP1, MP2, MP3)
+#+end_src
+
+Then it says this. In JS /undefined/ is good enough, and let makes strict.
+
+#+begin_src scheme
+    (define HOST1 Void)
+    (define PR1 Void)
+    (define PR2 Void)
+    (define PR3 Void)
+    (define GR1 Void)
+#+end_src
+
+#+begin_src js :noweb-ref mp1_1
+  let HOST1, PR1, PR2, PR3, GR1;
+#+end_src
+
+
+Then it has some def of printing for the PRn's. I won't bother with that yet.
+
+But it runs a method called =lst= and the =cr= function next.
+
+#+begin_src scheme
+  ;; Displaying the snapshots
+    (^ 'lst MP1)(cr)
+    (^ 'lst MP2)(cr)
+    (^ 'lst MP3)(cr)
+#+end_src
+
+Now, because we have async state for the procs we need to wait on them before we access the underlying scheme.
+
+#+begin_src js :noweb-ref mp1_1
+  const { cr } = StateChannels;
+  await MP1.$promise; MP1.lst().then(cr); cr()
+  await MP2.$promise; MP2.lst().then(cr);
+  await MP3.$promise; MP3.lst().then(cr);
+#+end_src
+
+Now we get to move on.
+
+* Create a =ProcHost= object
+
+#+begin_src scheme
+ ;; Creating the host
+    (set! HOST1 (proch 'USER 'system
+                         'UID "HOST1"))
+    (current-proch! HOST1)
+#+end_src
+
+We'll make that fairly simple.
+
+#+begin_src scheme :noweb-ref proch
+         (begin
+           (def (make-proch user uid)
+             (def usym (if (string? user) (string->symbol user) user))
+             (let ((h (proch 'USER usym 'UID uid)))
+               ;;(displayln "Have Proch" h)
+               (doublewrap h)))
+           (##inline-host-statement "
+         globalThis.StateChannels.makeProcHost = (user, uid) =>
+          @async_call@(true, false, @1@, [@host2scm@(user), @host2scm@(uid)]).then(h => {
+             //console.log('Have return', h);
+             return h
+          });"
+                                    make-proch))
+
+#+end_src
+
+And the constructor.
+
+#+begin_src js :noweb-ref js-micropay
+  function ProcHost(slots) {
+    const { makeProcHost , Rexpr } = StateChannels;
+    this.$proxy = Rexpr.call(this, false);
+    this.$promise = makeProcHost(slots.user, slots.uid).then(m => {
+      // console.log("Hve m ", m, "For This", this)
+      this.$scm = m
+      return true
+      }).catch((e) => { this.$error = e ; return false })
+    Object.setPrototypeOf(this, Object.create(this.$proxy))
+    return this
+  }
+  ProcHost.prototype = Object.create(Rexpr.prototype);
+  ProcHost.prototype.constructor = ProcHost
+
+  globalThis.StateChannels.ProcHost = ProcHost;
+#+end_src
+
+Now the =current-proch!= AKA currentProcHost
+
+
+#+begin_src scheme :noweb-ref proch
+    (begin
+      (##inline-host-statement "
+    globalThis.StateChannels.currentProcHost = (proc = false) => {
+      const scm = proc instanceof Rexpr ? proc.$scm : proc
+      return @async_call@(false, false, @1@, proc ? [scm] : []);
+   };"
+                               current-proch!))
+
+#+end_src
+
+** mp1_1 time
+
+#+begin_src js :noweb-ref mp1_1
+
+    let { currentProcHost, ProcHost } = StateChannels;
+
+    HOST1 = new ProcHost({ name: "system", uid: "host1"});
+    await HOST1.$promise ; currentProcHost(HOST1);
+
+#+end_src
+
+* Procs and net-enter
+
+#+begin_src scheme
+     ;; Creating the procs
+    (set! PR1 (procl 'USER "smith"
+                     'UID "PR1"
+                     'SELF MP1))
+    (set! PR2 (procl 'USER "dupont"
+                     'UID "PR2"
+                     'SELF MP2))
+    (set! PR3 (procl 'USER "durand"
+                     'UID "PR3"
+                     'SELF MP3))
+    (net-enter PR1)
+    (net-enter PR2)
+    (net-enter PR3)
+#+end_src
+
+#+begin_src scheme :noweb-ref proch
+  (##inline-host-statement "
+  _async_call_scm = function (need_result, thread_scm, proc_scm, args_scm) {
+
+  var promise = new Promise(function (resolve, reject) {
+
+    function done(err, result) {
+      if (err !== null) {
+        reject(new Error(err));
+      } else {
+        resolve(result);
+      }
+    };
+
+    args_scm.unshift(proc_scm);               // procedure to call
+
+    if (need_result) {
+      args_scm.unshift(_function2scm(done)); // Scheme callback for result
+    } else {
+      args_scm.unshift(_host2scm(false));    // no result needed
+      done(null, _host2scm(void 0));         // cause #!void to be returned
+    }
+
+    args_scm.unshift(thread_scm);             // run in specific thread
+
+    _callback_queue.write(args_scm);
+  });
+
+  return promise;
+};
+")
+#+end_src
+#+begin_src scheme :noweb-ref proch
+  (begin
+    (def (make-procla user uid self)
+      (displayln "Make Procl" user uid self)
+      (let ((h (procl 'USER user 'UID uid 'SELF self)))
+        (displayln "Have Procl : " h)
+        h
+        #;(doublewrap h)))
+      (##inline-host-statement "
+  globalThis.StateChannels.makeProcLa = (user, uid, self) => {
+  const { Rexpr } = StateChannels;
+   const scm = self instanceof Rexpr ? self.$scm : self ;
+   return @async_call_scm@(true, false, @1@,
+    [@host2scm@(user), @host2scm@(uid), scm]);
+  };"
+                             list)
+    (##inline-host-statement "
+  globalThis.StateChannels.makeProcL = (user, uid, self) => {
+  const { Rexpr } = StateChannels;
+   const scm = self instanceof Rexpr ? self.$scm : self ;
+   return @async_call_scm@(true, false, @1@,
+    [@host2scm@(user), @host2scm@(uid), scm]);
+  };"
+                             make-procla))
+#+end_src
+
+
+#+begin_src js :noweb-ref js-micropay
+  function ProcL(slots) {
+    const { makeProcL , Rexpr } = StateChannels;
+    this.$proxy = Rexpr.call(this, false);
+    this.$promise = makeProcL(slots.user, slots.uid, slots.self).then(m => {
+      console.log("Have Procl ", m, "For This", this)
+      this.$scm = m
+      return true
+      }).catch((e) => { this.$error = e ; throw e })
+   // Object.setPrototypeOf(this, Object.create(this.$proxy))
+    return this.$proxy
+  }
+  ProcL.prototype = Object.create(Rexpr.prototype);
+  ProcL.prototype.constructor = ProcL
+
+  globalThis.StateChannels.ProcL = ProcL;
+#+end_src
+
+#+begin_src scheme :noweb-ref proch
+    (begin
+      (##inline-host-statement "
+    globalThis.StateChannels.netEnter = (proc) => {
+      const scm = proc instanceof Rexpr ? proc.$scm : proc
+      return @async_call@(false, false, @1@, proc ? [scm] : []);
+   };"
+                               net-enter))
+
+#+end_src
+
+** mp1_1 again
+
+#+begin_src js :noweb-ref NOmp1_1
+
+  let { ProcL, netEnter } = StateChannels;
+  PR1 = new ProcL({ user: "smith", uid: "PR1", self: MP1})
+  PR2 = new ProcL({ user: "dupont", uid: "PR2", self: MP2})
+  PR3 = new ProcL({ user: "durand", uid: "PR3", self: MP3})
+
+  await PR1.$promise; netEnter(PR1);
+  await PR2.$promise; netEnter(PR2);
+  await PR3.$promise; netEnter(PR3);
+
+  console.log("ProcL", PR1, PR1.$promise)
+
+
+#+end_src
+
+* Group and Netlist
+
+#+begin_src scheme
+  (set! GR1 (proc-group+attach Void PR1 PR2 PR3))
+    (:= GR1 'UID "GR1")
+    (:= GR1 'USER "nobody")
+    (outraw "---\n")
+    (netlist 1)(cr)
+
+#+end_src
+
+
+#+begin_src scheme :noweb-ref proch
+  (begin
+    (def (make-ProcGroupAndAttach procs (first Void))
+      (let ((h (apply proc-group+attach first procs)))
+        ;;(displayln "Have Proch" h)
+        (doublewrap h)))
+    (##inline-host-statement "
+  globalThis.StateChannels.makeProcGroupAndAttach = (procs) => {
+   const { Rexpr } = StateChannels;
+   const scms = procs.map(self => self instanceof Rexpr ? self.$scm : self) ;
+   return @async_call@(true, false, @1@, procs);
+   };"
+                             make-ProcGroupAndAttach))
+#+end_src
+
+#+begin_src js :noweb-ref js-micropay
+  function ProcGroupAndAttach(...procs) {
+    const { makeProcGroupAndAttach , Rexpr } = StateChannels;
+    this.$proxy = Rexpr.call(this, false);
+    this.$promise = makeProcGroupAndAttach(procs).then(m => {
+      // console.log("Hve m ", m, "For This", this)
+      this.$scm = m
+      return true
+      }).catch((e) => { this.$error = e ; return false })
+    Object.setPrototypeOf(this, Object.create(this.$proxy))
+    return this
+  }
+  ProcGroupAndAttach.prototype = Object.create(Rexpr.prototype);
+  ProcGroupAndAttach.prototype.constructor = ProcGroupAndAttach
+
+  globalThis.StateChannels.ProcGroupAndAttach = ProcGroupAndAttach;
+#+end_src
+
+
+#+begin_src js :noweb-ref NOmp1_1
+
+  let { ProcGroupAndAttach } = StateChannels;
+  GR1 = new ProcGroupAndAttach(PR1, PR2, PR3);
+
+  await GR1.$promise; console.log("GR1", GR1.$promise);
+
+
+#+end_src
+* /File/ ../examples/mp1_1.ss
+
+#+begin_src scheme :tangle ../examples/mp1_1.ss :noweb yes
+    (export #t)
+  (import ../src/runtime)
+  (import ../src/cli)
+  (import ../src/apimon)
+  (import ./mp1)
+
+  (import :gerbil/gambit/threads)
+
+  (define (main . args)
+    ;; Creating the proc snapshots
+    (define MP1 (micropay 'smith 10 'dupont 10 'durand 10))
+    (define MP2 (micropay 'smith 10 'dupont 10 'durand 10))
+    (define MP3 (micropay 'smith 10 'dupont 10 'durand 10))
+    (define HOST1 Void)
+    (define PR1 Void)
+    (define PR2 Void)
+    (define PR3 Void)
+    (define GR1 Void)
+
+    (##inline-host-statement "
+    // console.log('Mpay', @1@, @scm2host@(@1@));
+    window.GLO = @glo@" MP1)
+
+
+    (##inline-host-declaration "
+    window.StateChannels = { exit: false }")
+    (##inline-host-statement
+     "window.StateChannels.objs =
+       { MP1: @1@ }"
+     MP1)
+
+    (def (call-method-using-string str obj . args)
+      (apply mcall (string->symbol str) obj args))
+
+  (##inline-host-statement "
+     window.StateChannels.cr = () => @async_call@(false, false, @2@, []);
+      window.StateChannels.mcall = (meth, obj, ...args) => {
+        const xargs = @host2scm@(args);
+        return @async_call@(false, false, @1@,[@host2scm@(meth), obj, ...xargs])
+      };" call-method-using-string cr)
+
+  (displayln "slot as well?: " (void? (method (typeof MP1) 'lsta))
+             (unspecified? (: MP1 'lst)) "method" )
+
+   (def (property-value obj name)
+     (def sym (if (symbol? name) name (string->symbol name)))
+     (def val (: obj name))
+     (if (unspecified? val) (method (typeof obj) sym)))
+
+   (##inline-host-statement "window.StateChannels.foreign = @host2foreign@")
+   (##inline-host-statement
+    "window.StateChannels.propertyValue = (obj, name) =>
+       @async_call@(true, false, @1@, [obj, @host2scm@(name)])"
+    property-value)
+  (begin
+    (def (makeMicropay accounts)
+      (def args '())
+      (vector-for-each
+       (lambda (v)
+         (match v (#(str n)
+                   (set! args (cons* n (string->symbol str) args)))))
+       accounts)
+      (set! args (reverse args))
+      (let* ((mp (apply micropay args))
+             (f  (##inline-host-expression "@host2foreign@(@1@)" mp)))
+        (##inline-host-expression "@host2foreign@(@1@)" f)))
+    (##inline-host-statement "
+    window.StateChannels.makeMicropay = @scm2host@(@1@) "
+                            makeMicropay))
+
+
+  <<doublewrap>>
+
+  <<slot-value>>
+
+  <<makeRexpr>>
+
+  <<proch>>
+
+  (##inline-host-statement #<<EOF
+  <<RexprP>>
+
+  <<js-micropay>>
+  globalThis.main = async () => {
+    <<mp1_1>>
+  }
+  EOF
+  )
+  (def (call-to-exit?)
+    (##inline-host-expression "@host2scm@(StateChannels.exit)"))
+
+  (def n 0)
+
+    (let lp ()
+      (let ((e? (call-to-exit?)))
+       ; (displayln "Call to exit? " (call-to-exit?) " " n)
+        (set! n (+ n 1))
+        (if e? (displayln "Exiting...")
+            (begin (##thread-sleep! 2)
+                   (lp)))))
+
+    (define (lstp . STATES)
+      (outraw "---\n")
+      (_lsp2 PR1)(cr)
+      (_lsp2 PR2)(cr)
+      (_lsp2 PR3)(cr)
+      (if (not (empty? STATES))
+        (begin
+          (outraw "=>\n")
+          (^ 'lst MP1)(cr)
+          (^ 'lst MP2)(cr)
+          (^ 'lst MP3)(cr))))
+
+    ;; Displaying the snapshots
+    (^ 'lst MP1)(cr)
+    (^ 'lst MP2)(cr)
+    (^ 'lst MP3)(cr)
+
+    ;; Creating the host
+    (set! HOST1 (proch 'USER 'system
+                         'UID "HOST1"))
+    (current-proch! HOST1)
+
+    ;; Creating the procs
+    (set! PR1 (procl 'USER "smith"
+                     'UID "PR1"
+                     'SELF MP1))
+    (set! PR2 (procl 'USER "dupont"
+                     'UID "PR2"
+                     'SELF MP2))
+    (set! PR3 (procl 'USER "durand"
+                     'UID "PR3"
+                     'SELF MP3))
+    (net-enter PR1)
+    (net-enter PR2)
+    (net-enter PR3)
+
+    (set! GR1 (proc-group+attach Void PR1 PR2 PR3))
+    (:= GR1 'UID "GR1")
+    (:= GR1 'USER "nobody")
+    (outraw "---\n")
+    (netlist 1)(cr)
+
+    ;; Doing a micropayment
+    (current-proc! PR1)
+    (^ 'send (: PR1 'GROUP) 'transfer 'dupont 5)
+    (lstp)
+
+    (^ 'step PR1)
+    (lstp)
+
+    (^ 'step PR2)
+    (lstp 1)
+
+    (^ 'step PR1)
+    (lstp 1)
+
+    (^ 'step PR1)
+    (lstp)
+
+    (^ 'step PR3)
+    (lstp 1)
+
+    (^ 'step PR1)
+    (lstp))
+
+  (displayln "Current tg: "
+             (thread-group->thread-list (current-thread-group)))
+
+  ;(main)
+
+#+end_src
