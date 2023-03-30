@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2023-03-28 Tue 16:35 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>State Channels in Javascript</title>
+<meta name="author" content="Drew Crampsie" />
+<meta name="generator" content="Org Mode" />
+<style>
+  #content { max-width: 60em; margin: auto; }
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #e6e6e6;
+    border-radius: 3px;
+    background-color: #f2f2f2;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    padding: 3px;
+    color: #555;
+    background-color: #f2f2f299;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-authinfo::before { content: 'Authinfo'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { }
+</style>
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">State Channels in Javascript</h1>
+<p>
+This is a simple way to start interacting with <code>state-channels</code> in the browser.
+</p>
+
+<script src="state-channels.js"></script>
+<style> pre.src-js:before { content: 'Javascript (click to copy)'; } </style>
+<script>
+ function copyToClipboard(element) {
+  let $tmp = document.createElement('textarea');
+  element.append($tmp); $tmp.value = element.textContent;
+  $tmp.select(); document.execCommand("copy");
+  $tmp.remove()
+}
+function copyPreSetup () {
+  // console.log("Pre Setup")
+   document.querySelectorAll('.src-js').forEach(e => {
+ //   console.log("Set Onclicl")
+   e.onclick = function () { copyToClipboard(this) }
+   })
+  }
+
+  document.querySelector('body').onload = function() {copyPreSetup()};
+
+</script>
+
+<p>
+First we must include the <code>.js</code> in the <code>.html</code> file. If you're viewing this as HTML this has already been done.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-html">&lt;<span style="color: #82aaff;">script</span> <span style="color: #ffcb6b;">src</span>=<span style="color: #c3e88d;">"state-channels.js"</span>&gt;&lt;/<span style="color: #82aaff;">script</span>&gt;
+</pre>
+</div>
+
+<p>
+Then open up the inspector and see the console.
+</p>
+
+<p>
+The interaction with the <b>State Channels Virtual Machine (SCVM)</b> is contained within the <code>StateChannels</code> global object.
+</p>
+
+<p>
+The objects that are shared between the browser, the virtual machine, and potentially other peers and servers are known as <code>Rexpr</code>'s.
+</p>
+
+<div id="outline-container-orgf8609d5" class="outline-2">
+<h2 id="orgf8609d5">Micropay</h2>
+<div class="outline-text-2" id="text-orgf8609d5">
+<p>
+Let's start with a <code>Micropay</code> transaction across three peers.
+</p>
+
+<p>
+First import the <code>Micropay</code> constructor.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #89DDFF;">const</span> <span style="color: #c792ea;">{</span> Micropay <span style="color: #c792ea;">}</span> = StateChannels;
+</pre>
+</div>
+
+<p>
+The <code>Micropay</code> contructs a <code>Rexpr</code> of the <code>tmicropay</code> type on the <b>SCVM</b>. These <code>Rexpr</code>'s represent the shared state of 3 different peer nodes.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">MP1</span> = <span style="color: #89DDFF;">new</span> <span style="color: #c792ea;">Micropay</span><span style="color: #c792ea;">(</span><span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"smith"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"dupont"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"durand"</span>, 10<span style="color: #f78c6c;">]</span><span style="color: #c792ea;">)</span>,
+    MP2 = <span style="color: #89DDFF;">new</span> <span style="color: #c792ea;">Micropay</span><span style="color: #c792ea;">(</span><span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"smith"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"dupont"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"durand"</span>, 10<span style="color: #f78c6c;">]</span><span style="color: #c792ea;">)</span>,
+    MP3 = <span style="color: #89DDFF;">new</span> <span style="color: #c792ea;">Micropay</span><span style="color: #c792ea;">(</span><span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"smith"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"dupont"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"durand"</span>, 10<span style="color: #f78c6c;">]</span><span style="color: #c792ea;">)</span>;
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org25199c1" class="outline-2">
+<h2 id="org25199c1">Async <code>Rexpr</code> interaction and Promises</h2>
+<div class="outline-text-2" id="text-org25199c1">
+<p>
+Because the <b>SCVM</b> runs outside of the standard <b>JavaScript VM</b> and interacts with the network almost nothing it does is syncronous.
+</p>
+
+<p>
+In fact, even the construction of it is threaded. Thus the first thing we must do is wait on the promise.
+</p>
+
+<p>
+Regardless of chosing the <code>async/await</code> approach or the <code>.then</code> continuation any <code>Rexpr</code> object has a <code>$promise</code> property that has a result of the succesful creation in the <b>SCVM</b> of that object.
+</p>
+
+<p>
+To interact with the browser let's keep it simple. Copy this over.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">outId</span> = <span style="color: #c3e88d;">"#output"</span>, <span style="color: #ffcb6b;">stdout</span> = <span style="color: #c792ea;">(</span>...things<span style="color: #c792ea;">)</span> =&gt; <span style="color: #c792ea;">{</span>
+  things.map<span style="color: #f78c6c;">(</span>i =&gt; <span style="color: #89DDFF;">typeof</span> i === <span style="color: #c3e88d;">'string'</span> ? i : JSON.stringify<span style="color: #c3e88d;">(</span>i<span style="color: #c3e88d;">)</span><span style="color: #f78c6c;">)</span>
+    .map<span style="color: #f78c6c;">(</span>out =&gt; $<span style="color: #c3e88d;">(</span>outId<span style="color: #c3e88d;">)</span>.innerHTML = $<span style="color: #c3e88d;">(</span>outId<span style="color: #c3e88d;">)</span>.innerHTML + out<span style="color: #f78c6c;">)</span>
+<span style="color: #c792ea;">}</span>
+
+</pre>
+</div>
+
+<p>
+Now following the descibed source block below is the actual HTML it describes.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-html">&lt;<span style="color: #82aaff;">h2</span>&gt;<span style="font-weight: bold; font-style: italic; text-decoration: underline;">Output</span>&lt;/<span style="color: #82aaff;">h2</span>&gt;
+&lt;<span style="color: #82aaff;">textarea</span>
+  <span style="color: #ffcb6b;">id</span>=<span style="color: #c3e88d;">"output"</span> <span style="color: #ffcb6b;">style</span>=<span style="color: #c3e88d;">"width:100%"</span>
+  <span style="color: #ffcb6b;">oninput</span>=<span style="color: #c3e88d;">'this.style.height = "";this.style.height = this.scrollHeight + "px"'</span>&gt;&lt;/<span style="color: #82aaff;">textarea</span>&gt;
+</pre>
+</div>
+
+<h2>Output</h2>
+<textarea
+  id="output" style="width:100%"
+  oninput='this.style.height = "";this.style.height = this.scrollHeight + "px"'></textarea>
+
+<p>
+So <code>stdout("YAY!\n")</code> does what you expect.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf1c412f" class="outline-2">
+<h2 id="orgf1c412f">Promise Interaction</h2>
+<div class="outline-text-2" id="text-orgf1c412f">
+<p>
+Let's look at the promises. First Continuation Passing Style.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js">MP1.$promise.then<span style="color: #c792ea;">(</span>val =&gt; stdout<span style="color: #f78c6c;">(</span><span style="color: #c3e88d;">"Was it succesfully constructed? : "</span>, val, <span style="color: #c3e88d;">"\n"</span><span style="color: #f78c6c;">)</span><span style="color: #c792ea;">)</span>
+</pre>
+</div>
+
+<p>
+And iterative.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">wasBuilt</span> = <span style="color: #89DDFF;">await</span> MP2.$promise;
+stdout<span style="color: #c792ea;">(</span><span style="color: #c3e88d;">"It was built ok?\n"</span>, wasBuilt<span style="color: #c792ea;">)</span>;
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb059c5d" class="outline-2">
+<h2 id="orgb059c5d">The <code>$</code> property prefix</h2>
+<div class="outline-text-2" id="text-orgb059c5d">
+<p>
+There are some properties, like <code>$promise</code> for example, that start with the dollar sign. In general, with the exception of the intruductory one, these are non-promise properties that are "plain javascript" and not an <b>SCVM</b> interaction.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgc05bb83" class="outline-2">
+<h2 id="orgc05bb83">Method Call</h2>
+<div class="outline-text-2" id="text-orgc05bb83">
+<p>
+All methods return a promise.To call a method we can mostly use the tried and true way. For example a <code>Micropay</code> <code>Rexpr</code> has an <code>lst</code> method that outputs the balance of the accounts to the console.
+</p>
+
+<p>
+Let's capture that for demonstration purposes.
+</p>
+
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #c792ea;">(</span><span style="color: #89DDFF;">function</span> <span style="color: #f78c6c;">()</span> <span style="color: #f78c6c;">{</span>
+    <span style="color: #89DDFF;">var</span> <span style="color: #ffcb6b;">oldLog</span> = console.log;
+    console.log = <span style="color: #89DDFF;">function</span> <span style="color: #c3e88d;">(</span>...message<span style="color: #c3e88d;">)</span> <span style="color: #c3e88d;">{</span>
+      stdout<span style="color: #89DDFF;">(</span>...<span style="color: #f78c6c;">arguments</span>, <span style="color: #c3e88d;">"\n"</span><span style="color: #89DDFF;">)</span>;
+      oldLog.apply<span style="color: #89DDFF;">(</span>console, <span style="color: #f78c6c;">arguments</span><span style="color: #89DDFF;">)</span>;
+    <span style="color: #c3e88d;">}</span>;
+<span style="color: #f78c6c;">}</span><span style="color: #c792ea;">)()</span>;
+</pre>
+</div>
+
+<p>
+Now our <b>Output</b> textarea may no longer be in view. Move it underneath this section so when scrolling down we see it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #c792ea;">(</span>_=&gt; <span style="color: #f78c6c;">{</span>
+  <span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">oe</span> = $<span style="color: #c3e88d;">(</span><span style="color: #c3e88d;">"#output"</span><span style="color: #c3e88d;">)</span>, <span style="color: #ffcb6b;">me</span> =$<span style="color: #c3e88d;">(</span><span style="color: #c3e88d;">"#methodEnd"</span><span style="color: #c3e88d;">)</span>
+  oe.remove<span style="color: #c3e88d;">()</span>; me.append<span style="color: #c3e88d;">(</span>oe<span style="color: #c3e88d;">)</span>; oe.style.height = <span style="color: #c3e88d;">'6em'</span>;
+<span style="color: #f78c6c;">}</span><span style="color: #c792ea;">)()</span>;
+</pre>
+</div>
+
+<p>
+We still do not know if <code>MP3</code> was properly constructed and we should never run any methods on an invalid object so we'll start with that promise.
+</p>
+
+<p>
+Like many methods <code>lst</code> does not return a result. But, we'll use the promise to improve the output as the virtual machine expects a carriage return to complete the output.
+</p>
+
+<p>
+There are many times when it is useful to know when something has been finished.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #89DDFF;">const</span> <span style="color: #c792ea;">{</span> cr <span style="color: #c792ea;">}</span> = StateChannels
+<span style="color: #89DDFF;">await</span> MP3.$promise; MP3.lst<span style="color: #c792ea;">()</span>.then<span style="color: #c792ea;">(</span>cr<span style="color: #c792ea;">)</span>
+</pre>
+</div>
+
+<div id="methodEnd"></div>
+</div>
+</div>
+
+<div id="outline-container-org5240a7a" class="outline-2">
+<h2 id="org5240a7a">Soliloquy</h2>
+<div class="outline-text-2" id="text-org5240a7a">
+<p>
+There's a lot more to come :)
+</p>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Drew Crampsie</p>
+<p class="date">Created: 2023-03-28 Tue 16:35</p>
+<p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

@@ -712,7 +712,7 @@ Now, because we have async state for the procs we need to wait on them before we
 
 #+begin_src js :noweb-ref mp1_1
   const { cr } = StateChannels;
-  await MP1.$promise; MP1.lst().then(cr); cr()
+  await MP1.$promise; MP1.lst().then(cr);
   await MP2.$promise; MP2.lst().then(cr);
   await MP3.$promise; MP3.lst().then(cr);
 #+end_src
@@ -900,7 +900,7 @@ Now the =current-proch!= AKA currentProcHost
 
 ** mp1_1 again
 
-#+begin_src js :noweb-ref NOmp1_1
+#+begin_src js :noweb-ref mp1_1
 
   let { ProcL, netEnter } = StateChannels;
   PR1 = new ProcL({ user: "smith", uid: "PR1", self: MP1})
@@ -962,7 +962,7 @@ Now the =current-proch!= AKA currentProcHost
 #+end_src
 
 
-#+begin_src js :noweb-ref NOmp1_1
+#+begin_src js :noweb-ref mp1_1
 
   let { ProcGroupAndAttach } = StateChannels;
   GR1 = new ProcGroupAndAttach(PR1, PR2, PR3);
@@ -971,10 +971,22 @@ Now the =current-proch!= AKA currentProcHost
 
 
 #+end_src
+
+* Today's Conclusion
+
+Phone Call with Higher Ups means release as is and go back at it tomorrow. Yay! :)
+
+
+* /File/ ../examples/mp1_1.js
+
+#+begin_src scheme :tangle ../examples/mp1_1.js :noweb yes
+  <<mp1_1>>
+#+end_src
+
 * /File/ ../examples/mp1_1.ss
 
 #+begin_src scheme :tangle ../examples/mp1_1.ss :noweb yes
-    (export #t)
+  (export #t)
   (import ../src/runtime)
   (import ../src/cli)
   (import ../src/apimon)

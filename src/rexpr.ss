@@ -475,12 +475,13 @@
   (set! PARM (mvparms F PARM))
   (apply mcall (cons F PARM)))
 
-;(define ^ mcall) ;; TODO: improve this ugly thing
-;(define ^? mcallv)
-(define-macro (^ . PARM) ;; NOTE: temporary s$%t to enable compiling to enable lifting to Gambit ; remove this asap.
-  `(mcall . ,PARM)) ;; TODO: improve this ugly thing
-(define-macro (^? . PARM)
-  `(mcallv ,(car PARM) . ,(cdr PARM)))
+(define ^ mcall) ;; TODO: improve this ugly thing
+(define ^? mcallv)
+
+;; (define-macro (^ . PARM) ;; NOTE: temporary s$%t to enable compiling to enable lifting to Gambit ; remove this asap.
+;;   `(mcall . ,PARM)) ;; TODO: improve this ugly thing
+;; (define-macro (^? . PARM)
+;;   `(mcallv ,(car PARM) . ,(cdr PARM)))
 
 ;; CSV-like files
 (define (csv-read FNAME TY SLOT)

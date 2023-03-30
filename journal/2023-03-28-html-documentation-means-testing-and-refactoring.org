@@ -1,0 +1,932 @@
+#+title: HTML Documentation means testing and refactoring
+#+date: <2023-03-28 10:34>
+#+description:
+#+filetags:
+
+After making the =StateChannels= *JavaScript Object* we needed something to show the end-user how to use it.
+
+The =html/state-channels.ss= will take over from the mp1_1.ss.
+
+#+begin_src bash :session html-doc-shell :dir ../
+  if [[ ! -n $SC_SRC ]]; then
+      export SC_SRC=$(pwd)
+  fi
+  cd $SC_SRC; ./bin/make browser
+#+end_src
+
+#+begin_src scheme :noweb-ref html-build-spec
+    (def html-bin-build-spec
+    '((static-exe:
+       "html/state-channels"  bin: "state-channels.js.stripped"
+       "-target" "js")))
+#+end_src
+
+* The toplevel heap: No translation to/from scheme/js
+
+I keep running into problems while trying to build a layer over Rexprs as the =scm2host= and =host2scm= keep bumping heads.
+
+#+begin_src js :noweb-ref globalStateChannels
+  globalThis.StateChannels = {
+    exit: false,
+    heap: {}
+  }
+#+end_src
+
+Funcall is simple and just grabs the object from the heap.
+
+#+begin_src js :noweb-ref stateChannelsFuncall
+    globalThis.StateChannels.funcall = (f, ...args) => {
+      const { heap, fncall } = StateChannels;
+      return @async_call@(true, false, fncall, [f, ...args]).then(p => {
+        const pointer = p instanceof @Scheme@ ? p.a : p,
+              ret = heap[pointer]
+        delete heap[pointer]
+        return ret
+      });
+    }
+#+end_src
+
+The shortened =fncall= is as follows.
+
+#+begin_src scheme :noweb yes :noweb-ref place-on-heap
+  (def (place-on-heap obj (pointer (gensym)))
+    (##inline-host-expression "(_=> {
+    const { heap } = StateChannels;
+    const p = @scm2host@(@2@);
+    heap[p] = @1@;
+    return p
+  })();
+  "
+                             obj pointer
+  ))
+
+  (begin
+    (def (fncall f . args) (place-on-heap (apply f args)))
+    (let ((fn fncall))
+      ;;(displayln "passing to js:" fn fncall)
+    (##inline-host-statement "
+  <<stateChannelsFuncall>>" )));
+
+  (##inline-host-statement "globalThis.StateChannels.fncall = @1@"
+                             fncall)
+#+end_src
+
+
+That makes a brand new slot-value possible!
+
+* Slot Value as funcall!
+
+Now that we have a working funcall we can create our slot value that way.
+
+Down below we have our own version of [[#SC_scm2host][scm2host]] that has =Rexpr='s.
+
+#+begin_src js :noweb-ref SC-slot_value
+        Object.assign(globalThis.StateChannels, {
+          slot_value(obj, name, translate = false) {
+            const { funcall, scm2host, Rexpr } = StateChannels,
+                  scm_slot_value = @1@,
+                  scm_obj = obj instanceof Rexpr ? obj.$scm : obj,
+                  scm_name = @host2scm@(name);
+
+            return funcall(scm_slot_value, scm_obj, scm_name).then(v => {
+              console.log('have slot value', v, scm2host(v))
+               return translate ? scm2host(v) : v
+            })
+          }
+        });
+#+end_src
+
+#+begin_src scheme :noweb yes :noweb-ref slot-value
+  (def (slot-value obj name)
+    (let* ((sym (if (symbol? name) name (string->symbol name)))
+           (val (: obj sym)))
+      (if (not (unspecified? val)) val)))
+
+  (##inline-host-statement #<<EOF
+   <<SC-slot_value>>
+  EOF
+  slot-value)
+#+end_src
+
+* Also, =find_method= is a great idea
+
+#+begin_src scheme :noweb-ref find-method
+  (def (find-rexpr-method rexpr name)
+    (def sym (if (symbol? name) name (string->symbol name)))
+    ;; (displayln "looking for " sym " method in " rexpr)
+    (let ((m (method (typeof rexpr) sym)))
+      ;; (displayln "Found " m " in " (typeof rexpr))
+      m))
+#+end_src
+
+#+begin_src js :noweb-ref SC-find-method
+  Object.assign(globalThis.StateChannels, {
+    find_method(obj, name) {
+      const { funcall } = StateChannels,
+            scm_find_method = @1@,
+            scm_obj = obj instanceof Rexpr ? obj.$scm : obj,
+            scm_name = @host2scm@(name);
+
+      return funcall(scm_find_method, scm_obj, scm_name).then(v => {
+        return v ? v : undefined
+      })
+    }
+  });
+#+end_src
+
+#+begin_src scheme :noweb yes :noweb-ref find-method
+  (##inline-host-statement #<<EOF
+   <<SC-find-method>>
+  EOF
+  find-rexpr-method
+  )
+#+end_src
+
+* Now a =call_method=, because it works
+
+#+begin_src js :noweb-ref SC-call_method
+  Object.assign(globalThis.StateChannels, {
+    call_method(meth, obj, ...args) {
+      const { find_method, host2scm, funcall } = StateChannels,
+            scm_obj = obj instanceof Rexpr ? obj.$scm : obj,
+            scm_args = args.map(host2scm)
+      if (typeof meth === 'string') {
+        return find_method(scm_obj, meth).then(m => {
+          return !m ? error("Method not found") : m
+        })
+      } else { return funcall(meth, scm_obj, ...scm_args) }
+    }
+  });
+
+#+end_src
+
+* The Rexpr proxy handler
+
+Now that we have a simple way to get things from a Rexpr we can also make a =property_value= function that merges things with JavaScript.
+
+If there's a slot-value, yup, otherwise the method is returned.
+
+#+begin_src js :noweb-ref SC-property_value
+  Object.assign(globalThis.StateChannels, {
+    property_value(obj, name, translate = false) {
+      const { slot_value, find_method, call_method } = StateChannels
+      return slot_value(obj, name, translate).then(sv => {
+        if (sv === undefined) {
+          return find_method(obj, name).then(meth => {
+            if (!meth) {
+              return obj[name]
+            } else {
+              return meth
+            }
+          })
+        } else { return sv}
+      })
+    }
+  });
+
+
+
+
+#+end_src
+
+#+begin_src js :noweb-ref makeRexprHandler
+  const makeRexprHandler = (obj) => {
+     const proto = Object.getPrototypeOf(obj);
+    return {
+      getPrototypeOf(target) { return proto ; },
+      get(target, prop, rec) {
+       // console.log("target:", target)
+        if (Object.hasOwn(target, prop) || prop.startsWith('$')) {
+          console.warn("Accessing ", prop, " In", target)
+           return Reflect.get(...arguments);
+        } else {
+        return promiseProxy(StateChannels.slot_value(target.$scm, prop, true)
+          .then(val => typeof val !== "undefined" ? val :
+                StateChannels.hasMethod(target.$scm, prop)
+                .then(meth => {
+                  if (typeof meth === "undefined") {
+                    Reflect.get(proto, prop, rec);
+                  } else {
+                    return (...args) => StateChannels.mcall(prop, target.$scm, ...args);
+                  }
+                })
+               )
+                           )
+        }
+      }
+    }
+  }
+
+
+#+end_src
+
+
+* The Promise Proxy
+
+The idea is simple. We want to be able to call a function returned by a promise without await or then.
+
+Because we also want the Promise to work as such we bind any returned get() function values to the promise so ~.then~ etc work.
+
+#+begin_src js :noweb-ref promiseProxy
+ const promiseProxy = (prom) => {
+    return new Proxy(() => prom, {
+      get: function(target, prop) {
+        var value = target()[prop];
+        return typeof value == 'function' ? value.bind(target()) : value;
+      },
+      apply: function(target, thisArg, argumentsList) {
+        return target().then(f => {
+          if (typeof f === 'function') {
+            return f(...argumentsList)
+          } else { return f }
+        })
+    }
+    })
+  };
+#+end_src
+
+* The Rexpr constructor
+
+#+begin_src js :noweb-ref RexprP
+  StateChannels.rexpr_type = ($scm) => {
+    const { car, asym_get } = StateChannels;
+    const t = car(asym_get($scm, ":TYPE"));
+    return @scm2host@(car(asym_get(t, ":NAME")))
+  }
+
+  function RexprType () { return this };
+
+  function Rexpr (type = "@@rexpr", obj = {}) {
+    const { makeRexpr, rexpr_type } = StateChannels ;
+    if (!type) {
+      this.$type = rexpr_type(obj);
+      this.$scm = obj
+    } else if (typeof type === 'object' && !(type instanceof RexprType)) {
+      this.$type = rexpr_type(type);
+      this.$scm = type
+    } else {
+      makeRexpr(type, Object.entries(obj)).then(r => {
+        this.$type = rexpr_type(r);
+        this.$scm = r })
+    }
+    // console.log("Made Rexpr", this)
+    return this.proxify();
+  };
+
+  const proxifyRexpr = (obj) => {
+    const { makeRexprHandler } = StateChannels;
+    const handler = makeRexprHandler(obj);
+    const prox = new Proxy(obj, handler);
+    return prox;
+  }
+
+   Rexpr.prototype.proxify = function () {
+      return proxifyRexpr(this);
+   }
+
+
+#+end_src
+
+* Add Rexpr to scm2host and host2scm
+:PROPERTIES:
+:CUSTOM_ID: SC_scm2host
+:END:
+
+There are things that return them and a lot of other reasons why a rexpr can be built that way so let us do it!
+
+#+begin_src js :noweb-ref globalStateChannels
+  Object.assign(StateChannels, {
+    rexpr2host(rexpr) {
+    return new StateChannels.Rexpr(false, rexpr)
+    },
+    scm2host(scm) {
+      const { rexpr_type, old_scm2host, rexpr2host } = StateChannels;
+      if (scm instanceof @Pair@ && typeof rexpr_type(scm) === 'string') {
+        return rexpr2host(scm);
+      } else if (scm instanceof Rexpr) {
+        return scm;
+      } else {
+        return @scm2host@(scm)
+      }
+    },
+    host2scm(host) {
+      if (host instanceof Rexpr) {
+        return host.$scm;
+      } else {
+        return host2scm(host)
+      }
+    }
+  });
+
+
+  Object.assign(StateChannels, {
+    listp(obj) { return obj instanceof @Pair@ || obj === null },
+    consp(obj) { return obj instanceof @Pair@ },
+    car(obj) { return StateChannels.consp(obj) && obj.a },
+    cdr(obj) { return StateChannels.consp(obj) && obj.b },
+    symbolp(obj) { return obj instanceof @ScmSymbol@ },
+    symbol_name(obj) { return StateChannels.symbolp(obj) && obj.a },
+    asym_get(kons, key) {
+      const { consp, car, cdr, symbolp, symbol_name, asym_get } = StateChannels;
+      if (!consp(kons)) { return };
+      let kar = car(kons); if (!consp(kar)) {return};
+      if (symbolp(car(kar)) && symbol_name(car(kar)) === key) {
+        return cdr(kar)
+      } else {
+        return asym_get(cdr(kons), key)
+      }
+    }
+  })
+
+#+end_src
+
+* /File/ =html/state-channels.ss=
+
+#+begin_src scheme :tangle ../html/state-channels.ss :noweb yes
+  (export #t)
+  (import ../src/runtime)
+  (import ../src/cli)
+  (import ../src/apimon)
+  (import ../examples/mp1)
+
+  (import :gerbil/gambit/threads)
+
+  (##inline-host-declaration #<<EOF
+  <<globalStateChannels>>
+
+  globalThis.StateChannels.makeRexpr = () => {
+      alert('should later be a scm tranny')
+       return new Promise((r) => {
+        (function () { console.log(new Error().stack) })()
+        r(true)
+        })
+   }                                 ;
+
+
+  (_=> {
+    <<promiseProxy>>
+
+    <<makeRexprHandler>>
+
+    Object.assign(globalThis.StateChannels, {
+      makeRexprHandler, promiseProxy
+    })
+  })();
+
+  <<RexprP>>
+
+  EOF
+  )
+
+  (define (main . args)
+
+    <<place-on-heap>>
+    (place-on-heap ['foo 'bar 'baz])
+    (fncall list 1 2 42)
+
+  <<slot-value>>
+
+  <<find-method>>
+
+  (##inline-host-statement #<<EOF
+   <<SC-call_method>>
+  EOF
+  )
+
+    ;; Creating the proc snapshots
+    (define MP1 (micropay 'smith 10 'dupont 10 'durand 10))
+    (define MP2 (micropay 'smith 10 'dupont 10 'durand 10))
+    (define MP3 (micropay 'smith 10 'dupont 10 'durand 10))
+    (define HOST1 Void)
+    (define PR1 Void)
+    (define PR2 Void)
+    (define PR3 Void)
+    (define GR1 Void)
+
+    (place-on-heap MP1)
+
+    (##inline-host-statement "
+    // console.log('Mpay', @1@, @scm2host@(@1@));
+    globalThis.StateChannels.Rexpr = Rexpr
+    window.GLO = @glo@" MP1)
+
+
+    (##inline-host-statement
+     "globalThis.StateChannels.objs =
+       { MP1: @1@ }"
+     MP1)
+
+    (def (call-method-using-string str obj . args)
+      (apply mcall (string->symbol str) obj args))
+
+  (##inline-host-statement "
+     window.StateChannels.cr = () => @async_call@(false, false, @2@, []);
+      window.StateChannels.mcall = (meth, obj, ...args) => {
+        const xargs = @host2scm@(args);
+        return @async_call@(false, false, @1@,[@host2scm@(meth), obj, ...xargs])
+      };" call-method-using-string cr)
+
+  (displayln "slot as well?: " (void? (method (typeof MP1) 'lsta))
+             (unspecified? (: MP1 'lst)) "method" )
+
+   (def (property-value obj name)
+     (def sym (if (symbol? name) name (string->symbol name)))
+     (def val (: obj name))
+     (if (unspecified? val) (method (typeof obj) sym)))
+
+   (##inline-host-statement "window.StateChannels.foreign = @host2foreign@")
+   (##inline-host-statement
+    "window.StateChannels.propertyValue = (obj, name) =>
+       @async_call@(true, false, @1@, [obj, @host2scm@(name)])"
+    property-value)
+  (begin
+    (def (makeMicropay accounts)
+      (def args '())
+      (vector-for-each
+       (lambda (v)
+         (match v (#(str n)
+                   (set! args (cons* n (string->symbol str) args)))))
+       accounts)
+      (set! args (reverse args))
+      (let* ((mp (apply micropay args))
+             (f  (##inline-host-expression "@host2foreign@(@1@)" mp)))
+        (##inline-host-expression "@host2foreign@(@1@)" f)))
+    (##inline-host-statement "
+    window.StateChannels.makeMicropay = @scm2host@(@1@) "
+                            makeMicropay))
+
+
+  (def (doublewrap obj)
+     (##inline-host-expression "@host2foreign@(@host2foreign@(@1@))" obj))
+
+
+  (begin
+  (def (slot-method? obj name)
+    (def sym (if (symbol? name) name (string->symbol name)))
+    (method (typeof obj) sym))
+  (##inline-host-statement
+   "window.StateChannels.hasMethod = (obj, name) =>
+     @async_call@(true, false, @1@, [obj, @host2scm@(name)])"
+   slot-method?))
+
+
+  (begin ;; makeRexpr and the globalThis.StateChannels binding
+    (def (makeRexpr type vslots)
+      (def scm-type (if (string? type) (string->symbol type) type))
+      (def slots '())
+      (vector-for-each
+       (lambda (v)
+         (match v (#(n val)
+                   (set! slots (cons* val (string->symbol n) slots)))))
+       vslots)
+      (set! slots (reverse slots))
+      ;; (displayln "Slots: " slots)
+      (doublewrap (rexpr scm-type `(,@slots))))
+
+      (##inline-host-statement "
+     // alert('inline');
+    window.StateChannels.makeRexpr = @scm2host@(@1@) "
+                               makeRexpr))
+
+  (begin
+    (def (make-proch user uid)
+      (def usym (if (string? user) (string->symbol user) user))
+      (let ((h (proch 'USER usym 'UID uid)))
+        ;;(displayln "Have Proch" h)
+        (doublewrap h)))
+    (##inline-host-statement "
+  globalThis.StateChannels.makeProcHost = (user, uid) =>
+   @async_call@(true, false, @1@, [@host2scm@(user), @host2scm@(uid)]).then(h => {
+      //console.log('Have return', h);
+      return h
+   });"
+                             make-proch))
+
+   (begin
+     (##inline-host-statement "
+   globalThis.StateChannels.currentProcHost = (proc = false) => {
+     const scm = proc instanceof Rexpr ? proc.$scm : proc
+     return @async_call@(false, false, @1@, proc ? [scm] : []);
+  };"
+                              current-proch!))
+
+    (##inline-host-statement "
+    _async_call_scm = function (need_result, thread_scm, proc_scm, args_scm) {
+
+    var promise = new Promise(function (resolve, reject) {
+
+      function done(err, result) {
+        if (err !== null) {
+          reject(new Error(err));
+        } else {
+          resolve(result);
+        }
+      };
+
+      args_scm.unshift(proc_scm);               // procedure to call
+
+      if (need_result) {
+        args_scm.unshift(_function2scm(done)); // Scheme callback for result
+      } else {
+        args_scm.unshift(_host2scm(false));    // no result needed
+        done(null, _host2scm(void 0));         // cause #!void to be returned
+      }
+
+      args_scm.unshift(thread_scm);             // run in specific thread
+
+      _callback_queue.write(args_scm);
+    });
+
+    return promise;
+  };
+  ")
+  (begin
+    (def (make-procla user uid self)
+      (displayln "Make Procl" user uid self)
+      (let ((h (procl 'USER user 'UID uid 'SELF self)))
+        (displayln "Have Procl : " h)
+        h
+        #;(doublewrap h)))
+      (##inline-host-statement "
+  globalThis.StateChannels.makeProcLa = (user, uid, self) => {
+  const { Rexpr } = StateChannels;
+   const scm = self instanceof Rexpr ? self.$scm : self ;
+   return @async_call_scm@(true, false, @1@,
+    [@host2scm@(user), @host2scm@(uid), scm]);
+  };"
+                             list)
+    (##inline-host-statement "
+  globalThis.StateChannels.makeProcL = (user, uid, self) => {
+  const { Rexpr } = StateChannels;
+   const scm = self instanceof Rexpr ? self.$scm : self ;
+   return @async_call_scm@(true, false, @1@,
+    [@host2scm@(user), @host2scm@(uid), scm]);
+  };"
+                             make-procla))
+   (begin
+     (##inline-host-statement "
+   globalThis.StateChannels.netEnter = (proc) => {
+     const scm = proc instanceof Rexpr ? proc.$scm : proc
+     return @async_call@(false, false, @1@, proc ? [scm] : []);
+  };"
+                              net-enter))
+
+  (begin
+    (def (make-ProcGroupAndAttach procs (first Void))
+      (let ((h (apply proc-group+attach first procs)))
+        ;;(displayln "Have Proch" h)
+        (doublewrap h)))
+    (##inline-host-statement "
+  globalThis.StateChannels.makeProcGroupAndAttach = (procs) => {
+   const { Rexpr } = StateChannels;
+   const scms = procs.map(self => self instanceof Rexpr ? self.$scm : self) ;
+   return @async_call@(true, false, @1@, procs);
+   };"
+                             make-ProcGroupAndAttach))
+
+  (##inline-host-statement #<<EOF
+  const promiseProxy = (prom) => {
+    return new Proxy(() => prom, {
+      get: function(target, prop) {
+        var value = target()[prop];
+        return typeof value == 'function' ? value.bind(target()) : value;
+      },
+      apply: function(target, thisArg, argumentsList) {
+        return target().then(f => {
+          if (typeof f === 'function') {
+            return f(...argumentsList)
+          } else { return f }
+        })
+    }
+    })
+  };
+
+  function Micropay(...accounts) {
+    const { makeMicropay , Rexpr } = StateChannels;
+    this.$proxy = Rexpr.call(this, false);
+    const self = this
+    this.$promise = makeMicropay(accounts).then(m => {
+      self.$scm = m
+      return true
+      }).catch((e) => { self.$error = e ; return false })
+    Object.setPrototypeOf(this, Object.create(this.$proxy))
+    return this
+  }
+  Micropay.prototype = Object.create(Rexpr.prototype);
+  Micropay.prototype.constructor = Micropay
+
+  globalThis.StateChannels.Micropay = Micropay;
+  function ProcHost(slots) {
+    const { makeProcHost , Rexpr } = StateChannels;
+    this.$proxy = Rexpr.call(this, false);
+    this.$promise = makeProcHost(slots.user, slots.uid).then(m => {
+      // console.log("Hve m ", m, "For This", this)
+      this.$scm = m
+      return true
+      }).catch((e) => { this.$error = e ; return false })
+    Object.setPrototypeOf(this, Object.create(this.$proxy))
+    return this
+  }
+  ProcHost.prototype = Object.create(Rexpr.prototype);
+  ProcHost.prototype.constructor = ProcHost
+
+  globalThis.StateChannels.ProcHost = ProcHost;
+  function ProcL(slots) {
+    const { makeProcL , Rexpr } = StateChannels;
+    this.$proxy = Rexpr.call(this, false);
+    this.$promise = makeProcL(slots.user, slots.uid, slots.self).then(m => {
+      console.log("Have Procl ", m, "For This", this)
+      this.$scm = m
+      return true
+      }).catch((e) => { this.$error = e ; throw e })
+   // Object.setPrototypeOf(this, Object.create(this.$proxy))
+    return this.$proxy
+  }
+  ProcL.prototype = Object.create(Rexpr.prototype);
+  ProcL.prototype.constructor = ProcL
+
+  globalThis.StateChannels.ProcL = ProcL;
+  function ProcGroupAndAttach(...procs) {
+    const { makeProcGroupAndAttach , Rexpr } = StateChannels;
+    this.$proxy = Rexpr.call(this, false);
+    this.$promise = makeProcGroupAndAttach(procs).then(m => {
+      // console.log("Hve m ", m, "For This", this)
+      this.$scm = m
+      return true
+      }).catch((e) => { this.$error = e ; return false })
+    Object.setPrototypeOf(this, Object.create(this.$proxy))
+    return this
+  }
+  ProcGroupAndAttach.prototype = Object.create(Rexpr.prototype);
+  ProcGroupAndAttach.prototype.constructor = ProcGroupAndAttach
+
+  globalThis.StateChannels.ProcGroupAndAttach = ProcGroupAndAttach;
+  globalThis.main = async () => {
+      // ;; Creating the proc snapshots
+    const MP1 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]),
+          MP2 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]),
+          MP3 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]);
+
+    console.log("Have MPS:", MP1, MP2, MP3)
+    let HOST1, PR1, PR2, PR3, GR1;
+    const { cr } = StateChannels;
+    await MP1.$promise; MP1.lst().then(cr);
+    await MP2.$promise; MP2.lst().then(cr);
+    await MP3.$promise; MP3.lst().then(cr);
+
+    let { currentProcHost, ProcHost } = StateChannels;
+
+    HOST1 = new ProcHost({ name: "system", uid: "host1"});
+    await HOST1.$promise ; currentProcHost(HOST1);
+
+
+    let { ProcL, netEnter } = StateChannels;
+    PR1 = new ProcL({ user: "smith", uid: "PR1", self: MP1})
+    PR2 = new ProcL({ user: "dupont", uid: "PR2", self: MP2})
+    PR3 = new ProcL({ user: "durand", uid: "PR3", self: MP3})
+
+    await PR1.$promise; netEnter(PR1);
+    await PR2.$promise; netEnter(PR2);
+    await PR3.$promise; netEnter(PR3);
+
+    console.log("ProcL", PR1, PR1.$promise)
+
+
+
+    let { ProcGroupAndAttach } = StateChannels;
+    GR1 = new ProcGroupAndAttach(PR1, PR2, PR3);
+
+    await GR1.$promise; console.log("GR1", GR1.$promise);
+
+
+  }
+  EOF
+  )
+  (def (call-to-exit?)
+    (##inline-host-expression "@host2scm@(StateChannels.exit)"))
+
+  (def n 0)
+
+    (let lp ()
+      (let ((e? (call-to-exit?)))
+       ; (displayln "Call to exit? " (call-to-exit?) " " n)
+        (set! n (+ n 1))
+        (if e? (displayln "Exiting...")
+            (begin (##thread-sleep! 2)
+                   (lp)))))
+
+    (define (lstp . STATES)
+      (outraw "---\n")
+      (_lsp2 PR1)(cr)
+      (_lsp2 PR2)(cr)
+      (_lsp2 PR3)(cr)
+      (if (not (empty? STATES))
+        (begin
+          (outraw "=>\n")
+          (^ 'lst MP1)(cr)
+          (^ 'lst MP2)(cr)
+          (^ 'lst MP3)(cr))))
+
+    ;; Displaying the snapshots
+    (^ 'lst MP1)(cr)
+    (^ 'lst MP2)(cr)
+    (^ 'lst MP3)(cr)
+
+    ;; Creating the host
+    (set! HOST1 (proch 'USER 'system
+                         'UID "HOST1"))
+    (current-proch! HOST1)
+
+    ;; Creating the procs
+    (set! PR1 (procl 'USER "smith"
+                     'UID "PR1"
+                     'SELF MP1))
+    (set! PR2 (procl 'USER "dupont"
+                     'UID "PR2"
+                     'SELF MP2))
+    (set! PR3 (procl 'USER "durand"
+                     'UID "PR3"
+                     'SELF MP3))
+    (net-enter PR1)
+    (net-enter PR2)
+    (net-enter PR3)
+
+    (set! GR1 (proc-group+attach Void PR1 PR2 PR3))
+    (:= GR1 'UID "GR1")
+    (:= GR1 'USER "nobody")
+    (outraw "---\n")
+    (netlist 1)(cr)
+
+    ;; Doing a micropayment
+    (current-proc! PR1)
+    (^ 'send (: PR1 'GROUP) 'transfer 'dupont 5)
+    (lstp)
+
+    (^ 'step PR1)
+    (lstp)
+
+    (^ 'step PR2)
+    (lstp 1)
+
+    (^ 'step PR1)
+    (lstp 1)
+
+    (^ 'step PR1)
+    (lstp)
+
+    (^ 'step PR3)
+    (lstp 1)
+
+    (^ 'step PR1)
+    (lstp)
+
+  (displayln "Current tg: "
+             (thread-group->thread-list (current-thread-group))))
+
+  ;(main)
+#+end_src
+
+* File =build.ss=
+
+#+begin_src scheme :tangle ../build.ss  :noweb yes :shebang #!/usr/bin/env gxi
+  (import :std/make)
+
+  ;; * Meta Data
+  ;; the source directory anchor.
+  (def srcdir
+    (path-normalize (path-directory (this-source-file))))
+
+  (if (equal? srcdir (current-directory)) #t
+      (begin
+        (displayln "going into " srcdir " for building state-channels"
+                   " from " (initial-current-directory))
+        (current-directory srcdir)))
+
+  ;; * Build as a module library with static scm files as well.
+  ;; the library module build specification
+  (def (library-build-spec)
+    (def lib-build-spec '("src/socks" "examples/mp1" "examples/mp1_1" "exe"))
+    (let src ((fs (directory-files "src")))
+      ;; (displayln "have " (length fs) " files in src")
+      (if (not (null? fs))
+        (let ((f (car fs)))
+          ;; (displayln "f:" f (equal? f "clish_prg.ss"))
+          (if (and (equal? (path-extension f) ".ss")
+                   (not (equal? f "clish.ss"))
+                   (not (equal? f "scm2js.ss"))
+                   (not (equal? f "clish_prg.ss")))
+            (set! lib-build-spec
+              (cons (path-expand (path-strip-extension f)
+                                 "src/")
+                    lib-build-spec)))
+          (src (cdr fs)))))
+
+    lib-build-spec)
+
+  (def init-lib-build-spec (library-build-spec))
+  (def (make-lib (spec init-lib-build-spec))
+    ;; (displayln "making library from:" lib-build-spec)
+    (make srcdir: srcdir
+          bindir: srcdir
+          libdir: (path-expand "lib/" srcdir)
+          optimize: #t
+          debug: 'src      ; enable debugger introspection for library modules
+          static: #t       ; generate static compilation artifacts; required!
+          ;; prefix: "mukn/state-channels/
+          ;; build-deps: "build-deps" ; this value is the default
+          spec))
+
+
+  ;; * The machine code binary: =bin/exe=
+
+  (def bin-build-spec '((static-exe: "exe")))
+
+
+  (def (make-bin)
+    (def libdir (path-expand "lib/" srcdir))
+    (add-load-path libdir)
+    ;; this action builds the static executables -- no debug introspection
+    (make srcdir: srcdir
+          bindir: (path-expand "bin/" srcdir)
+          libdir: libdir
+          verbose: 2
+          optimize: #t
+          debug: #f             ; no debug bloat for executables
+          static: #t            ; generate static compilation artifacts; required!
+          build-deps: "build-deps-bin" ; importantly, pick a file that differs from above
+          bin-build-spec))
+
+  ;; * The node.js executable in =js/bin/exe=
+
+  (def js-bin-build-spec
+    '((static-exe: "exe"
+                                          ; "-verbose"
+                   "-target" "js")))
+
+  #;(def (compile-static-exe mod opts settings)
+    (def srcpath (source-path mod ".ss" settings))
+    (def binpath (binary-path mod opts settings))
+    (def gsc-opts (compile-exe-gsc-opts opts))
+    (def gxc-opts
+      [invoke-gsc: #t
+                   output-file: binpath
+                   verbose: (settings-verbose>=? settings 9)
+                   debug: (settings-static-debug settings)
+                   (when/list gsc-opts [gsc-options: gsc-opts]) ...])
+
+    (message "... compile static js? exe " mod " -> " gxc-opts)
+    (gxc-compile mod gsc-opts (make-settings-static settings))
+    (message "... compile static exe " mod " -> " binpath)
+    (gxc#compile-static-exe srcpath gxc-opts))
+
+  ;(set! std/make#compile-static-exe compile-static-exe)
+  (def (make-js-bin)
+    (def libdir (path-expand "lib/" srcdir))
+    (add-load-path libdir)
+    ;; this action builds the static executables -- no debug introspection
+    (make srcdir: srcdir
+          bindir: (path-expand "js/bin/" srcdir)
+          libdir: libdir
+          verbose: 2
+          optimize: #f
+          debug: #f             ; no debug bloat for executables
+          static: #t            ; generate static compilation artifacts; required!
+          build-deps: "build-deps-js-bin" ; importantly, pick a file that differs from above
+          js-bin-build-spec))
+
+  ;; * HTML build spec
+
+  <<html-build-spec>>
+
+  (def (make-html-bin)
+    (def libdir (path-expand "lib/" srcdir))
+    (add-load-path libdir)
+    ;; this action builds the static executables -- no debug introspection
+    (make srcdir: srcdir
+          bindir: (path-expand "html" srcdir)
+          libdir: libdir
+          verbose: 2
+          optimize: #f
+          debug: #f             ; no debug bloat for executables
+          static: #t            ; generate static compilation artifacts; required!
+          build-deps: "build-deps-html-bin" ; importantly, pick a file that differs from above
+          html-bin-build-spec))
+
+  (def (main . args)
+    (match args
+      (["copy-gerbil-state-src"]
+       (shell-command "./build gerbil"))
+      (["copy-filesocks_dummy"]
+       (shell-command "backends/build filesocks_dummy"))
+      (["lib"] (make-lib)
+       (make-lib (library-build-spec)))
+      (["bin"] (make-bin))
+      (["node"] (make-js-bin))
+      (["browser"] (make-html-bin))
+      ([]
+       (map main
+            ["copy-gerbil-state-src"
+             "copy-filesocks_dummy"
+             "lib" "bin" "node" "browser"]))))
+
+#+end_src
