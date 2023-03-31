@@ -65,56 +65,26 @@ globalThis.StateChannels.makeRexpr = () => {
 
 
 (_=> {
-  const promiseProxy = (prom) => {
-     return new Proxy(() => prom, {
-       get: function(target, prop) {
-         var value = target()[prop];
-         return typeof value == 'function' ? value.bind(target()) : value;
-       },
-       apply: function(target, thisArg, argumentsList) {
-         return target().then(f => {
-           if (typeof f === 'function') {
-             return f(...argumentsList)
-           } else { return f }
-         })
-     }
-     })
-   };
-
-  const makeRexprHandler = (obj) => {
-     const proto = Object.getPrototypeOf(obj);
-    return {
-      getPrototypeOf(target) { return proto ; },
-      get(target, prop, rec) {
-       // console.log("target:", target)
-        if (Object.hasOwn(target, prop) || prop.startsWith('$')) {
-          console.warn("Accessing ", prop, " In", target)
-           return Reflect.get(...arguments);
-        } else {
-        return promiseProxy(StateChannels.slot_value(target.$scm, prop, true)
-          .then(val => typeof val !== "undefined" ? val :
-                StateChannels.hasMethod(target.$scm, prop)
-                .then(meth => {
-                  if (typeof meth === "undefined") {
-                    Reflect.get(proto, prop, rec);
-                  } else {
-                    return (...args) => StateChannels.mcall(prop, target.$scm, ...args);
-                  }
-                })
-               )
-                           )
-        }
-      }
-    }
-  }
-  
-  
-
   Object.assign(globalThis.StateChannels, {
-    makeRexprHandler, promiseProxy
-  })
-})();
+    newPromiseProxy(prom) {
+      return new Proxy(() => prom, {
+        get: function(target, prop) {
+          var value = target()[prop];
+          return typeof value == 'function' ? value.bind(target()) : value;
+        },
+        apply: function(target, thisArg, argumentsList) {
+          return target().then(f => {
+            if (typeof f === 'function') {
+              return f(...argumentsList)
+            } else { return f }
+          })
+      }
+      })
+    }
+  });
 
+})();
+(_=> {
 StateChannels.rexpr_type = ($scm) => {
   const { car, asym_get } = StateChannels;
   const t = car(asym_get($scm, ":TYPE"));
@@ -124,34 +94,73 @@ StateChannels.rexpr_type = ($scm) => {
 function RexprType () { return this };
 
 function Rexpr (type = "@@rexpr", obj = {}) {
-  const { makeRexpr, rexpr_type } = StateChannels ;
-  if (!type) {
+  const { makeRexpr, rexpr_type } = StateChannels,
+        self = this;
+  if (!type && obj) {
     this.$type = rexpr_type(obj);
     this.$scm = obj
   } else if (typeof type === 'object' && !(type instanceof RexprType)) {
     this.$type = rexpr_type(type);
     this.$scm = type
+  } else if (!obj) {
+    null
   } else {
     makeRexpr(type, Object.entries(obj)).then(r => {
       this.$type = rexpr_type(r);
       this.$scm = r })
   }
-  // console.log("Made Rexpr", this)
-  return this.proxify();
+  const pxy = new Proxy(function Rexpr() { return self }, this.handler)
+  this.$proxy = pxy;
+  const poll_$scm = (resolve) => {
+    if (self.$scm === undefined ) {
+      setTimeout(poll_$scm, 10, resolve)
+    } else {
+      return resolve(self.$scm ? pxy : false)
+    }
+  }
+  this.$promise = new Promise(r => poll_$scm(r))
+  return this.$proxy;
 };
 
-const proxifyRexpr = (obj) => {
-  const { makeRexprHandler } = StateChannels;
-  const handler = makeRexprHandler(obj);
-  const prox = new Proxy(obj, handler);
-  return prox;
-}
 
- Rexpr.prototype.proxify = function () {
-    return proxifyRexpr(this);
- }
+Object.assign(Rexpr.prototype, {
+  getter(target, prop, receiver) {
+    const { newPromiseProxy, property_value, scm2host} = StateChannels;
+    if (Object.hasOwn(target, prop) || prop.startsWith('$')) {
+         return Reflect.get(...arguments);
+    }
+
+    else {
+      return newPromiseProxy(property_value(target, prop))
+                            // .then(o => { return scm2host(o) }))
+    }
+  }
+});
+
+Object.assign(Rexpr.prototype, {
+  apply(target, $this, args) {
+   // console.log('Apply?', ...arguments)
+    return target.$promise
+  }
+});
 
 
+Object.assign(Rexpr.prototype, {
+  handler: {
+    getPrototypeOf(return_target) {
+      return Object.getPrototypeOf(return_target())
+    },
+    get(return_target, prop, rec) {
+      if (prop === 'then') { return undefined }
+      const self = return_target()
+      return self.getter(self, prop, rec)
+    },
+    apply(rt, th, args) { return rt().apply(rt(), th, args) }
+  }
+});
+
+  globalThis.StateChannels.Rexpr = Rexpr
+})();
 
 EOF
 )
@@ -203,8 +212,8 @@ EOF
            scm_name = @host2scm@(name);
  
      return funcall(scm_slot_value, scm_obj, scm_name).then(v => {
-       console.log('have slot value', v, scm2host(v))
-        return translate ? scm2host(v) : v
+       //  console.log('have slot value', v, scm2host(v))
+       return translate ? scm2host(v) : v
      })
    }
  });
@@ -213,14 +222,14 @@ slot-value)
 
 (def (find-rexpr-method rexpr name)
   (def sym (if (symbol? name) name (string->symbol name)))
-  (displayln "looking for " sym " method in " rexpr)
+  ;; (displayln "looking for " sym " method in " rexpr)
   (let ((m (method (typeof rexpr) sym)))
-    (displayln "Found " m " in " (typeof rexpr))
+    ;; (displayln "Found " m " in " (typeof rexpr))
     m))
 (##inline-host-statement #<<EOF
  Object.assign(globalThis.StateChannels, {
    find_method(obj, name) {
-     const { funcall } = StateChannels,
+     const { funcall, Rexpr } = StateChannels,
            scm_find_method = @1@,
            scm_obj = obj instanceof Rexpr ? obj.$scm : obj,
            scm_name = @host2scm@(name);
@@ -234,10 +243,28 @@ EOF
 find-rexpr-method
 )
 
+(begin
+  (def (makeMicropay accounts)
+    (def args '())
+    (vector-for-each
+     (lambda (v)
+       (match v (#(str n)
+                 (set! args (cons* n (string->symbol str) args)))))
+     accounts)
+    (set! args (reverse args))
+    (apply micropay args))
+  (##inline-host-statement
+   "globalThis.StateChannels.makeMicropay = (accounts) => {
+     const { funcall } = StateChannels;
+     return funcall(@1@, @host2scm@(accounts))
+}" makeMicropay)
+
+  )
+
 (##inline-host-statement #<<EOF
  Object.assign(globalThis.StateChannels, {
    call_method(meth, obj, ...args) {
-     const { find_method, host2scm, funcall } = StateChannels,
+     const { find_method, host2scm, funcall, Rexpr } = StateChannels,
            scm_obj = obj instanceof Rexpr ? obj.$scm : obj,
            scm_args = args.map(host2scm)
      if (typeof meth === 'string') {
@@ -248,6 +275,51 @@ find-rexpr-method
    }
  });
  
+
+ Object.assign(globalThis.StateChannels, {
+   property_value(obj, name, translate = false) {
+     const { slot_value, find_method, call_method, scm2host } = StateChannels
+     return slot_value(obj, name, translate).then(sv => {
+       if (sv === undefined) {
+         return find_method(obj, name).then(meth => {
+           if (!meth) {
+             return obj[name]
+           } else {
+             return (...args) => {
+               return call_method(meth, obj, ...args)
+             }
+           }
+         })
+       } else { return scm2host(sv) }
+     })
+   }
+ })
+ 
+ 
+ 
+ 
+
+ function Micropay(...accounts) {
+   const { makeMicropay , Rexpr, rexpr_type } = StateChannels,
+         self = new Rexpr(false, false),
+         proto = Object.create(Object.getPrototypeOf(self))
+ 
+   Object.setPrototypeOf(Object.getPrototypeOf(this), proto);
+   Object.setPrototypeOf(self, Object.getPrototypeOf(this));
+   // console.log("Checking Accounts", accounts);
+   makeMicropay(accounts).then(mp => {
+     console.log('Got mp', mp);
+     self.$type = rexpr_type(mp)
+     self.$scm = mp;
+   });
+   return self;
+ }
+ 
+ Micropay.prototype.constructor = Micropay
+ 
+ globalThis.StateChannels.Micropay = Micropay;
+ 
+
 EOF
 )
 
@@ -265,14 +337,13 @@ EOF
 
   (##inline-host-statement "
   // console.log('Mpay', @1@, @scm2host@(@1@));
-  globalThis.StateChannels.Rexpr = Rexpr
   window.GLO = @glo@" MP1)
 
 
   (##inline-host-statement
    "globalThis.StateChannels.objs =
-     { MP1: @1@ }"
-   MP1)
+     { MP1: @1@, MP2: @2@, MP3: @3@ }"
+   MP1 MP2 MP3)
 
   (def (call-method-using-string str obj . args)
     (apply mcall (string->symbol str) obj args))
@@ -284,34 +355,10 @@ EOF
       return @async_call@(false, false, @1@,[@host2scm@(meth), obj, ...xargs])
     };" call-method-using-string cr)
 
-(displayln "slot as well?: " (void? (method (typeof MP1) 'lsta))
-           (unspecified? (: MP1 'lst)) "method" )
-
  (def (property-value obj name)
    (def sym (if (symbol? name) name (string->symbol name)))
    (def val (: obj name))
    (if (unspecified? val) (method (typeof obj) sym)))
-
- (##inline-host-statement "window.StateChannels.foreign = @host2foreign@")
- (##inline-host-statement
-  "window.StateChannels.propertyValue = (obj, name) =>
-     @async_call@(true, false, @1@, [obj, @host2scm@(name)])"
-  property-value)
-(begin
-  (def (makeMicropay accounts)
-    (def args '())
-    (vector-for-each
-     (lambda (v)
-       (match v (#(str n)
-                 (set! args (cons* n (string->symbol str) args)))))
-     accounts)
-    (set! args (reverse args))
-    (let* ((mp (apply micropay args))
-           (f  (##inline-host-expression "@host2foreign@(@1@)" mp)))
-      (##inline-host-expression "@host2foreign@(@1@)" f)))
-  (##inline-host-statement "
-  window.StateChannels.makeMicropay = @scm2host@(@1@) "
-                          makeMicropay))
 
 
 (def (doublewrap obj)
@@ -363,7 +410,7 @@ globalThis.StateChannels.makeProcHost = (user, uid) =>
  (begin
    (##inline-host-statement "
  globalThis.StateChannels.currentProcHost = (proc = false) => {
-   const scm = proc instanceof Rexpr ? proc.$scm : proc
+   const scm = proc instanceof StateChannels.Rexpr ? proc.$scm : proc
    return @async_call@(false, false, @1@, proc ? [scm] : []);
 };"
                             current-proch!))
@@ -424,7 +471,7 @@ const { Rexpr } = StateChannels;
  (begin
    (##inline-host-statement "
  globalThis.StateChannels.netEnter = (proc) => {
-   const scm = proc instanceof Rexpr ? proc.$scm : proc
+   const scm = proc instanceof StateChannels.Rexpr ? proc.$scm : proc
    return @async_call@(false, false, @1@, proc ? [scm] : []);
 };"
                             net-enter))
@@ -459,21 +506,6 @@ const promiseProxy = (prom) => {
   })
 };
 
-function Micropay(...accounts) {
-  const { makeMicropay , Rexpr } = StateChannels;
-  this.$proxy = Rexpr.call(this, false);
-  const self = this
-  this.$promise = makeMicropay(accounts).then(m => {
-    self.$scm = m
-    return true
-    }).catch((e) => { self.$error = e ; return false })
-  Object.setPrototypeOf(this, Object.create(this.$proxy))
-  return this
-}
-Micropay.prototype = Object.create(Rexpr.prototype);
-Micropay.prototype.constructor = Micropay
-
-globalThis.StateChannels.Micropay = Micropay;
 function ProcHost(slots) {
   const { makeProcHost , Rexpr } = StateChannels;
   this.$proxy = Rexpr.call(this, false);
@@ -485,7 +517,7 @@ function ProcHost(slots) {
   Object.setPrototypeOf(this, Object.create(this.$proxy))
   return this
 }
-ProcHost.prototype = Object.create(Rexpr.prototype);
+ProcHost.prototype = Object.create(StateChannels.Rexpr.prototype);
 ProcHost.prototype.constructor = ProcHost
 
 globalThis.StateChannels.ProcHost = ProcHost;
@@ -500,7 +532,7 @@ function ProcL(slots) {
  // Object.setPrototypeOf(this, Object.create(this.$proxy))
   return this.$proxy
 }
-ProcL.prototype = Object.create(Rexpr.prototype);
+ProcL.prototype = Object.create(StateChannels.Rexpr.prototype);
 ProcL.prototype.constructor = ProcL
 
 globalThis.StateChannels.ProcL = ProcL;
@@ -515,7 +547,7 @@ function ProcGroupAndAttach(...procs) {
   Object.setPrototypeOf(this, Object.create(this.$proxy))
   return this
 }
-ProcGroupAndAttach.prototype = Object.create(Rexpr.prototype);
+ProcGroupAndAttach.prototype = Object.create(StateChannels.Rexpr.prototype);
 ProcGroupAndAttach.prototype.constructor = ProcGroupAndAttach
 
 globalThis.StateChannels.ProcGroupAndAttach = ProcGroupAndAttach;

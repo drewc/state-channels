@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2023-03-28 Tue 16:35 -->
+<!-- 2023-03-30 Thu 19:31 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>State Channels in Javascript</title>
@@ -243,38 +243,41 @@ The interaction with the <b>State Channels Virtual Machine (SCVM)</b> is contain
 The objects that are shared between the browser, the virtual machine, and potentially other peers and servers are known as <code>Rexpr</code>'s.
 </p>
 
-<div id="outline-container-orgf8609d5" class="outline-2">
-<h2 id="orgf8609d5">Micropay</h2>
-<div class="outline-text-2" id="text-orgf8609d5">
+<div id="outline-container-org43d0a82" class="outline-2">
+<h2 id="org43d0a82">Micropay</h2>
+<div class="outline-text-2" id="text-org43d0a82">
 <p>
 Let's start with a <code>Micropay</code> transaction across three peers.
 </p>
 
-<p>
-First import the <code>Micropay</code> constructor.
-</p>
-
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #89DDFF;">const</span> <span style="color: #c792ea;">{</span> Micropay <span style="color: #c792ea;">}</span> = StateChannels;
+<pre class="src src-js"><span style="color: #89DDFF;">const</span> <span style="color: #c792ea;">{</span> Rexpr, objs, cr <span style="color: #c792ea;">}</span> = StateChannels,
+      MP1 = <span style="color: #89DDFF;">new</span> <span style="color: #c792ea;">Rexpr</span><span style="color: #c792ea;">(</span>objs.MP1<span style="color: #c792ea;">)</span>,
+      MP2 = <span style="color: #89DDFF;">new</span> <span style="color: #c792ea;">Rexpr</span><span style="color: #c792ea;">(</span>objs.MP2<span style="color: #c792ea;">)</span>,
+      MP3 = <span style="color: #89DDFF;">new</span> <span style="color: #c792ea;">Rexpr</span><span style="color: #c792ea;">(</span>objs.MP3<span style="color: #c792ea;">)</span>
+
+<span style="color: #676E95;">// </span><span style="color: #676E95;">Ideally this is as follows but I just broke that code</span>
+  <span style="color: #676E95;">// </span><span style="color: #676E95;">let MP1 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]),</span>
+  <span style="color: #676E95;">//     </span><span style="color: #676E95;">MP2 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]),</span>
+  <span style="color: #676E95;">//     </span><span style="color: #676E95;">MP3 = new Micropay(["smith", 10], ["dupont", 10], ["durand", 10]);</span>
 </pre>
 </div>
 
 <p>
-The <code>Micropay</code> contructs a <code>Rexpr</code> of the <code>tmicropay</code> type on the <b>SCVM</b>. These <code>Rexpr</code>'s represent the shared state of 3 different peer nodes.
+The <code>Micropay</code> contructs a <code>Rexpr</code> of the <code>micropay</code> type on the <b>SCVM</b>. These <code>Rexpr</code>'s represent the shared state of 3 different peer nodes.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">MP1</span> = <span style="color: #89DDFF;">new</span> <span style="color: #c792ea;">Micropay</span><span style="color: #c792ea;">(</span><span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"smith"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"dupont"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"durand"</span>, 10<span style="color: #f78c6c;">]</span><span style="color: #c792ea;">)</span>,
-    MP2 = <span style="color: #89DDFF;">new</span> <span style="color: #c792ea;">Micropay</span><span style="color: #c792ea;">(</span><span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"smith"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"dupont"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"durand"</span>, 10<span style="color: #f78c6c;">]</span><span style="color: #c792ea;">)</span>,
-    MP3 = <span style="color: #89DDFF;">new</span> <span style="color: #c792ea;">Micropay</span><span style="color: #c792ea;">(</span><span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"smith"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"dupont"</span>, 10<span style="color: #f78c6c;">]</span>, <span style="color: #f78c6c;">[</span><span style="color: #c3e88d;">"durand"</span>, 10<span style="color: #f78c6c;">]</span><span style="color: #c792ea;">)</span>;
+<pre class="src src-js">MP1.$type <span style="color: #676E95;">// </span><span style="color: #676E95;">=&gt; 'micropay'</span>
 </pre>
 </div>
 </div>
 </div>
 
-<div id="outline-container-org25199c1" class="outline-2">
-<h2 id="org25199c1">Async <code>Rexpr</code> interaction and Promises</h2>
-<div class="outline-text-2" id="text-org25199c1">
+
+<div id="outline-container-org2da8a8a" class="outline-2">
+<h2 id="org2da8a8a">Async <code>Rexpr</code> interaction and Promises</h2>
+<div class="outline-text-2" id="text-org2da8a8a">
 <p>
 Because the <b>SCVM</b> runs outside of the standard <b>JavaScript VM</b> and interacts with the network almost nothing it does is syncronous.
 </p>
@@ -292,9 +295,13 @@ To interact with the browser let's keep it simple. Copy this over.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">outId</span> = <span style="color: #c3e88d;">"#output"</span>, <span style="color: #ffcb6b;">stdout</span> = <span style="color: #c792ea;">(</span>...things<span style="color: #c792ea;">)</span> =&gt; <span style="color: #c792ea;">{</span>
+<pre class="src src-js">
+<span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">outId</span> = <span style="color: #c3e88d;">"#output"</span>
+
+<span style="color: #89DDFF;">function</span> <span style="color: #82aaff;">stdout</span><span style="color: #c792ea;">(</span>...things<span style="color: #c792ea;">)</span> <span style="color: #c792ea;">{</span>
   things.map<span style="color: #f78c6c;">(</span>i =&gt; <span style="color: #89DDFF;">typeof</span> i === <span style="color: #c3e88d;">'string'</span> ? i : JSON.stringify<span style="color: #c3e88d;">(</span>i<span style="color: #c3e88d;">)</span><span style="color: #f78c6c;">)</span>
     .map<span style="color: #f78c6c;">(</span>out =&gt; $<span style="color: #c3e88d;">(</span>outId<span style="color: #c3e88d;">)</span>.innerHTML = $<span style="color: #c3e88d;">(</span>outId<span style="color: #c3e88d;">)</span>.innerHTML + out<span style="color: #f78c6c;">)</span>
+  console.log<span style="color: #f78c6c;">(</span>...things<span style="color: #f78c6c;">)</span>
 <span style="color: #c792ea;">}</span>
 
 </pre>
@@ -323,15 +330,25 @@ So <code>stdout("YAY!\n")</code> does what you expect.
 </div>
 </div>
 
-<div id="outline-container-orgf1c412f" class="outline-2">
-<h2 id="orgf1c412f">Promise Interaction</h2>
-<div class="outline-text-2" id="text-orgf1c412f">
+<div id="outline-container-orgfdc4eff" class="outline-2">
+<h2 id="orgfdc4eff">Promise Interaction</h2>
+<div class="outline-text-2" id="text-orgfdc4eff">
 <p>
-Let's look at the promises. First Continuation Passing Style.
+Let's look at the promises. As mentioned even the contruction requires async code.
+</p>
+
+<p>
+There are two ways to access the promise. Either call the <code>Rexpr</code> as a function or look at the <code>$promise</code> property.
+</p>
+
+<p>
+First Continuation Passing Style.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js">MP1.$promise.then<span style="color: #c792ea;">(</span>val =&gt; stdout<span style="color: #f78c6c;">(</span><span style="color: #c3e88d;">"Was it succesfully constructed? : "</span>, val, <span style="color: #c3e88d;">"\n"</span><span style="color: #f78c6c;">)</span><span style="color: #c792ea;">)</span>
+<pre class="src src-js">MP1<span style="color: #c792ea;">()</span>.then<span style="color: #c792ea;">(</span>val =&gt; stdout<span style="color: #f78c6c;">(</span><span style="color: #c3e88d;">"Was it succesfully constructed? : "</span>, val, <span style="color: #c3e88d;">"\n"</span><span style="color: #f78c6c;">)</span><span style="color: #c792ea;">)</span>
+<span style="color: #676E95;">// </span><span style="color: #676E95;">or</span>
+MP1.$promise.then<span style="color: #c792ea;">(</span>val =&gt; stdout<span style="color: #f78c6c;">(</span><span style="color: #c3e88d;">"It was succesfully constructed! "</span>, val, <span style="color: #c3e88d;">"\n"</span><span style="color: #f78c6c;">)</span><span style="color: #c792ea;">)</span>
 </pre>
 </div>
 
@@ -340,59 +357,42 @@ And iterative.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">wasBuilt</span> = <span style="color: #89DDFF;">await</span> MP2.$promise;
+<pre class="src src-js"><span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">wasBuilt</span> = <span style="color: #89DDFF;">await</span> MP2<span style="color: #c792ea;">()</span>;
 stdout<span style="color: #c792ea;">(</span><span style="color: #c3e88d;">"It was built ok?\n"</span>, wasBuilt<span style="color: #c792ea;">)</span>;
 </pre>
 </div>
 </div>
 </div>
 
-<div id="outline-container-orgb059c5d" class="outline-2">
-<h2 id="orgb059c5d">The <code>$</code> property prefix</h2>
-<div class="outline-text-2" id="text-orgb059c5d">
+<div id="outline-container-orgd67ddf0" class="outline-2">
+<h2 id="orgd67ddf0">The <code>$</code> property prefix</h2>
+<div class="outline-text-2" id="text-orgd67ddf0">
 <p>
-There are some properties, like <code>$promise</code> for example, that start with the dollar sign. In general, with the exception of the intruductory one, these are non-promise properties that are "plain javascript" and not an <b>SCVM</b> interaction.
+There are some properties, like <code>$promise</code> for example, that start with the dollar sign. In general, with the exception of the <code>$promise</code> one, these are non-promise properties that are "plain javascript" and not an <b>SCVM</b> interaction.
 </p>
+
+<p>
+Here's what we have so far:
+</p>
+
+<dl class="org-dl">
+<dt>$promise</dt><dd>The constructor completion</dd>
+<dt>$scm</dt><dd>The <b>SCVM</b> version of this <code>Rexpr</code></dd>
+<dt>$type</dt><dd>The <code>Rexpr</code> type name</dd>
+</dl>
 </div>
 </div>
 
-<div id="outline-container-orgc05bb83" class="outline-2">
-<h2 id="orgc05bb83">Method Call</h2>
-<div class="outline-text-2" id="text-orgc05bb83">
+<div id="outline-container-org4fdf58f" class="outline-2">
+<h2 id="org4fdf58f">Method Call</h2>
+<div class="outline-text-2" id="text-org4fdf58f">
 <p>
 All methods return a promise.To call a method we can mostly use the tried and true way. For example a <code>Micropay</code> <code>Rexpr</code> has an <code>lst</code> method that outputs the balance of the accounts to the console.
 </p>
 
-<p>
-Let's capture that for demonstration purposes.
-</p>
-
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #c792ea;">(</span><span style="color: #89DDFF;">function</span> <span style="color: #f78c6c;">()</span> <span style="color: #f78c6c;">{</span>
-    <span style="color: #89DDFF;">var</span> <span style="color: #ffcb6b;">oldLog</span> = console.log;
-    console.log = <span style="color: #89DDFF;">function</span> <span style="color: #c3e88d;">(</span>...message<span style="color: #c3e88d;">)</span> <span style="color: #c3e88d;">{</span>
-      stdout<span style="color: #89DDFF;">(</span>...<span style="color: #f78c6c;">arguments</span>, <span style="color: #c3e88d;">"\n"</span><span style="color: #89DDFF;">)</span>;
-      oldLog.apply<span style="color: #89DDFF;">(</span>console, <span style="color: #f78c6c;">arguments</span><span style="color: #89DDFF;">)</span>;
-    <span style="color: #c3e88d;">}</span>;
-<span style="color: #f78c6c;">}</span><span style="color: #c792ea;">)()</span>;
-</pre>
-</div>
 
 <p>
-Now our <b>Output</b> textarea may no longer be in view. Move it underneath this section so when scrolling down we see it.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #c792ea;">(</span>_=&gt; <span style="color: #f78c6c;">{</span>
-  <span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">oe</span> = $<span style="color: #c3e88d;">(</span><span style="color: #c3e88d;">"#output"</span><span style="color: #c3e88d;">)</span>, <span style="color: #ffcb6b;">me</span> =$<span style="color: #c3e88d;">(</span><span style="color: #c3e88d;">"#methodEnd"</span><span style="color: #c3e88d;">)</span>
-  oe.remove<span style="color: #c3e88d;">()</span>; me.append<span style="color: #c3e88d;">(</span>oe<span style="color: #c3e88d;">)</span>; oe.style.height = <span style="color: #c3e88d;">'6em'</span>;
-<span style="color: #f78c6c;">}</span><span style="color: #c792ea;">)()</span>;
-</pre>
-</div>
-
-<p>
-We still do not know if <code>MP3</code> was properly constructed and we should never run any methods on an invalid object so we'll start with that promise.
+We still do not know if <code>MP3</code> was properly constructed and we should never run any methods on an invalid object so we'll start with waiting on the promise.
 </p>
 
 <p>
@@ -404,8 +404,7 @@ There are many times when it is useful to know when something has been finished.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #89DDFF;">const</span> <span style="color: #c792ea;">{</span> cr <span style="color: #c792ea;">}</span> = StateChannels
-<span style="color: #89DDFF;">await</span> MP3.$promise; MP3.lst<span style="color: #c792ea;">()</span>.then<span style="color: #c792ea;">(</span>cr<span style="color: #c792ea;">)</span>
+<pre class="src src-js"><span style="color: #89DDFF;">await</span> MP3<span style="color: #c792ea;">()</span>; MP3.lst<span style="color: #c792ea;">()</span>.then<span style="color: #c792ea;">(</span>cr<span style="color: #c792ea;">)</span>
 </pre>
 </div>
 
@@ -413,18 +412,63 @@ There are many times when it is useful to know when something has been finished.
 </div>
 </div>
 
-<div id="outline-container-org5240a7a" class="outline-2">
-<h2 id="org5240a7a">Soliloquy</h2>
-<div class="outline-text-2" id="text-org5240a7a">
+<div id="outline-container-orgfdb0fa4" class="outline-2">
+<h2 id="orgfdb0fa4">Slot values as properties</h2>
+<div class="outline-text-2" id="text-orgfdb0fa4">
+<p>
+In the <b>SCVM</b> an object can have methods associated with a "property" as well as "slots", which are normal values.
+</p>
+
+<p>
+We unite them in JavaScript. For example a <code>Micropay</code> has an <code>ACCOUNT</code> slot which carries the details of the state of every account involved.
+</p>
+
+<p>
+We know they are "smith", "durand" and "dupont". What are the values?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #89DDFF;">const</span> <span style="color: #ffcb6b;">account</span> = <span style="color: #89DDFF;">await</span> MP2.ACCOUNT,
+      smith = <span style="color: #89DDFF;">await</span> account.smith,
+      durand = <span style="color: #89DDFF;">await</span> account.durand,
+      dupont = <span style="color: #89DDFF;">await</span> account.dupont
+
+stdout<span style="color: #c792ea;">(</span><span style="color: #c3e88d;">"Smith: "</span>, smith, <span style="color: #c3e88d;">" Durand: "</span>, durand, <span style="color: #c3e88d;">" Dupont: "</span>, dupont<span style="color: #c792ea;">)</span>
+
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgc73a8ff" class="outline-2">
+<h2 id="orgc73a8ff">Soliloquy</h2>
+<div class="outline-text-2" id="text-orgc73a8ff">
 <p>
 There's a lot more to come :)
 </p>
+
+<p>
+Here's a TODO list
+</p>
+</div>
+
+<div id="outline-container-orgbe6373c" class="outline-3">
+<h3 id="orgbe6373c"><span class="todo TODO">TODO</span> Redo the Micropay constructor</h3>
+</div>
+<div id="outline-container-orgb43afb9" class="outline-3">
+<h3 id="orgb43afb9"><span class="todo TODO">TODO</span> list slots and methods of a <code>Rexpr</code></h3>
+</div>
+<div id="outline-container-orgf621c1e" class="outline-3">
+<h3 id="orgf621c1e"><span class="todo TODO">TODO</span> Set propery values of <code>Rexpr</code>'s</h3>
+</div>
+<div id="outline-container-orgf978dee" class="outline-3">
+<h3 id="orgf978dee"><span class="todo TODO">TODO</span> Redo the proc host and individual procs</h3>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Drew Crampsie</p>
-<p class="date">Created: 2023-03-28 Tue 16:35</p>
+<p class="date">Created: 2023-03-30 Thu 19:31</p>
 <p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
