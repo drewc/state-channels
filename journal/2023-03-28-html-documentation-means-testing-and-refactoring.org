@@ -238,6 +238,7 @@ Because we also want the Promise to work as such we bind any returned function v
 
 #+end_src
 
+** Apply the Rexpr to get a promise
 #+begin_src js :noweb-ref Rexpr.getter
   Object.assign(Rexpr.prototype, {
     apply(target, $this, args) {
@@ -247,6 +248,10 @@ Because we also want the Promise to work as such we bind any returned function v
   });
 
 #+end_src
+
+** The Setter
+
+
 ** Rexpr.prototype.handler
 
 Because we want our proxy to be callable the target is always a function. Our getter et all think it's a Rexpr Object. This is where it is changed.
@@ -362,6 +367,27 @@ There are things that return them and a lot of other reasons why a rexpr can be 
 
 #+end_src
 
+* =makeRexpr= to make a scheme rexpr
+
+#+begin_src scheme :noweb-ref makeRexpr
+  (begin ;; makeRexpr and the globalThis.StateChannels binding
+   (def (makeRexpr type vslots)
+     (def scm-type (if (string? type) (string->symbol type) type))
+     (def slots '())
+     (vector-for-each
+      (lambda (v)
+        (match v (#(n val)
+                  (set! slots (cons* val (string->symbol n) slots)))))
+      vslots)
+     (set! slots (reverse slots))
+     ;; (displayln "Slots: " slots)
+    (rexpr scm-type `(,@slots)))
+
+     (##inline-host-statement "
+    // alert('inline');
+   window.StateChannels.makeRexpr = @scm2host@(@1@) "
+                              makeRexpr))
+#+end_src
 * Finally!! Back to micropay
 #+begin_src scheme :noweb-ref makeMicropay
   (begin
@@ -383,27 +409,21 @@ There are things that return them and a lot of other reasons why a rexpr can be 
     )
 #+end_src
 #+begin_src js :noweb-ref Micropay
-  function Micropay(...accounts) {
-    const { makeMicropay , Rexpr, rexpr_type } = StateChannels,
-          self = new Rexpr(false, false),
-          proto = Object.create(Object.getPrototypeOf(self))
+    function Micropay(...accounts) {
+      const { makeMicropay , Rexpr, rexpr_type } = StateChannels,
+      makeMicropay(accounts).then(mp => {
+        console.log('Got mp', mp);
+      });
+    }
 
-    Object.setPrototypeOf(Object.getPrototypeOf(this), proto);
-    Object.setPrototypeOf(self, Object.getPrototypeOf(this));
-    // console.log("Checking Accounts", accounts);
-    makeMicropay(accounts).then(mp => {
-      console.log('Got mp', mp);
-      self.$type = rexpr_type(mp)
-      self.$scm = mp;
-    });
-    return self;
-  }
+  //  Micropay.prototype.constructor = Micropay
 
-  Micropay.prototype.constructor = Micropay
-
-  globalThis.StateChannels.Micropay = Micropay;
+    globalThis.StateChannels.Micropay = Micropay;
 
 #+end_src
+
+* Now a =proch= AKA =ProcHost=
+
 
 * /File/ =html/state-channels.ss=
 
@@ -519,23 +539,7 @@ There are things that return them and a lot of other reasons why a rexpr can be 
    slot-method?))
 
 
-  (begin ;; makeRexpr and the globalThis.StateChannels binding
-    (def (makeRexpr type vslots)
-      (def scm-type (if (string? type) (string->symbol type) type))
-      (def slots '())
-      (vector-for-each
-       (lambda (v)
-         (match v (#(n val)
-                   (set! slots (cons* val (string->symbol n) slots)))))
-       vslots)
-      (set! slots (reverse slots))
-      ;; (displayln "Slots: " slots)
-      (doublewrap (rexpr scm-type `(,@slots))))
-
-      (##inline-host-statement "
-     // alert('inline');
-    window.StateChannels.makeRexpr = @scm2host@(@1@) "
-                               makeRexpr))
+  <<makeRexpr>>
 
   (begin
     (def (make-proch user uid)

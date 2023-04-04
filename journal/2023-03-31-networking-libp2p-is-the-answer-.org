@@ -1,0 +1,463 @@
+#+title: Networking? `libp2p` is the answer!
+#+date: <2023-03-31 12:17>
+#+description:
+#+filetags:
+
+After getting the FFI to/from JS working in a non-intrusive manner we come down to networking. Easy with libp2p!
+
+#+begin_src bash :session libp2p-shell :dir ../
+  if [[ ! -n "$SC_SRC" ]] ; then
+      export SC_SRC="$(pwd)"
+  fi
+#+end_src
+
+#+RESULTS:
+
+* Introduction
+
+I was initially worried as the implementation I was given to work with used BSD sockets on Guile and I thought there would be a need to port that. It turns out it was just, as I call it, a proof of concept and not related to crypto and the blockchain.
+
+Now that I have delved further into it, =libp2p= really is the answer!
+
+
+* Code to "port"
+
+#+begin_src scheme
+;; Creating the host
+  (set! HOST1 (proch 'USER 'system
+                       'UID "HOST1"))
+  (current-proch! HOST1)
+
+  ;; Creating the procs
+  (set! PR1 (procl 'USER "smith"
+                   'UID "PR1"
+                   'SELF MP1))
+  (set! PR2 (procl 'USER "dupont"
+                   'UID "PR2"
+                   'SELF MP2))
+  (set! PR3 (procl 'USER "durand"
+                   'UID "PR3"
+                   'SELF MP3))
+  (net-enter PR1)
+  (net-enter PR2)
+  (net-enter PR3)
+  (set! GR1 (proc-group+attach Void PR1 PR2 PR3))
+  (:= GR1 'UID "GR1")
+  (:= GR1 'USER "nobody")
+  (outraw "---\n")
+  (netlist 1)(cr)
+#+end_src
+
+* Libp2p HOWTO's and docs and earworms
+
+https://javascript.plainenglish.io/writing-decentralized-applications-in-javascript-libp2p-basics-4fa46c5dae8a
+
+https://github.com/libp2p/js-libp2p/tree/master/examples/libp2p-in-the-browser
+
+https://github.com/libp2p/js-libp2p/blob/master/doc/CONFIGURATION.md <--- a lot in this one!
+
+* The =libp2p-in-browser= example, mutated to work in SC
+
+First we need to install the js-libp2p from gitub
+
+#+begin_src bash :session libp2p-shell :dir ../
+  mkdir libp2p
+  git remote add js-libp2p git@github.com:libp2p/js-libp2p.git
+  git fetch js-libp2p
+  git stash
+  git subtree add --prefix libp2p/js js-libp2p master --squash
+  git stash pop
+
+  cd libp2p/js;
+  npm install
+  npm run build
+
+  cd ./examples/libp2p-in-the-browser
+  npm install
+#+end_src
+
+Now, try it out!
+
+#+begin_src sh
+  npm start
+#+end_src
+=>
+#+begin_quote
+> libp2p-in-browser@1.0.0 start
+> vite index.html
+
+  vite v2.9.15 dev server running at:
+
+  > Local: http://localhost:3000/
+  > Network: use `--host` to expose
+
+  ready in 120ms.
+
+#+end_quote
+
+** Bring it over to our ./js library
+
+#+begin_src bash :session libp2p-shell :dir ../
+  cd $SC_SRC;
+  cp libp2p/js/examples/libp2p-in-the-browser/* ./js
+
+  cd js; e package.json
+#+end_src
+
+
+Changed it like this.
+
+#+begin_src json
+  {
+  "name": "state-channel-in-browser",
+  "version": "0.0.1",
+  "description": "A state-channel node running in the browser",
+  "type": "module",
+  ...
+  }
+#+end_src
+
+#+begin_src bash :session libp2p-shell :dir ../
+  npm install libp2p
+  npm install
+#+end_src
+
+* The demo now requires a server
+
+https://stackoverflow.com/questions/10752055/cross-origin-requests-are-only-supported-for-http-error-when-loading-a-local
+
+* Start with the index!
+
+The index.html is still generated from exporting [[file:~/me/MuKn/src/state-channels/doc/js-example.org][js-example.org]].
+
+But now there's a whole new index.js, and a vite configuration.
+
+
+Herein lies the index.js. It creates a libp2p node and connects to a server and then peers out in the world.
+
+https://libp2p.github.io/js-libp2p/functions/index.createLibp2p.html
+
+So [[https://github.com/libp2p/js-libp2p/blob/master/examples/chat/src/listener.js][in the chat example]] we see something interesting.
+
+#+begin_src js
+  // Handle messages for the protocol
+  await nodeListener.handle('/chat/1.0.0', async ({ stream }) => {
+    // Send stdin to the stream
+    stdinToStream(stream)
+    // Read the stream and output to console
+    streamToConsole(stream)
+  })
+#+end_src
+
+That's brilliant. Is it really this easy?
+
+#+begin_src js :noweb-ref noSC-handler
+  // Handle messages for the protocol
+   var mylibp2phandler = libp2p.handle('/state-channels/0.0.1', async ({ stream }) => {
+     console.info("I just saw another state-channel node!", stream)
+  })
+#+end_src
+
+Now for the "dialer" it says:
+
+#+begin_src js
+  // Dial to the remote peer (the "listener")
+  const listenerMa = multiaddr(`/ip4/127.0.0.1/tcp/10333/p2p/${idListener.toString()}`)
+  const stream = await nodeDialer.dialProtocol(listenerMa, '/chat/1.0.0')
+#+end_src
+
+Let's just add a listener. When we connect, we ask if they are ready to state-channel with us.
+
+#+begin_src js :noweb-ref no-discover-event-listener
+    // Listen for new peers
+  libp2p.addEventListener('peer:discovery', (evt) => {
+    const peer = evt.detail
+    log(`Found peer ${peer.id.toString()}`)
+
+    // dial them when we discover them
+    libp2p.dialProtocol(evt.detail.id, '/state-channels/0.0.1').then(p => { console.log('dial protocol response', p) }).catch(err => {
+       log(`Could not dial ${evt.detail.id}`, err)
+     })
+  })
+
+
+#+end_src
+
+
+* Create the Peer Object
+
+#+begin_src js :noweb-ref js-peers
+
+    function Peer(detail = { id: "RemoteId",
+                             stdin: "The stream to",
+                             stdout: "The stream from",
+                             libp2p: "the libp2p instance"
+                           }
+                 )
+  {
+      this.$sc = StateChannels;
+      Object.assign(this, detail)
+      const existing = this.exists()
+      if (existing) {
+        Object.assign(existing, this)
+        return existing;
+      } else return this.add();
+  }
+
+    const peerExists = (detail, sc = StateChannels) => {
+      return sc.peers.find(p => p.id === detail.id)
+    }
+
+    Peer.prototype.exists = function() {
+      return peerExists(this, this.$sc)
+    }
+
+    const addPeer = (peer, sc = StateChannels) => {
+      const pee = peer instanceof Peer ? peer : new Peer(peer);
+      sc.peers.push(pee)
+      return pee;
+    }
+
+    Peer.prototype.add = function () {
+      return addPeer(this, this.$sc)
+    }
+
+    const findPeer = (id, $sc = StateChannels) => {
+      const rid = typeof id === 'string' ? id : id.id;
+      return $sc.peers.find(p => p.id === rid);
+    };
+
+    Peer.prototype.find = function (id) {
+      if (id === undefined) { id = this.id }
+      return findPeer(id, this.$sc);
+    }
+
+
+    Object.assign(StateChannels, {
+      peers: [],
+      addPeer(detail) {
+        existing = peerExists(detail);
+        return existing || addPeer(detail)
+      },
+      Peer,
+      findPeer
+    });
+#+end_src
+
+* Work with the object!
+
+So what does the handler pass us?
+
+#+begin_src js :noweb-ref nopeSC-handler
+  // Handle messages for the protocol
+   var mylibp2phandler = libp2p.handle('/state-channels/0.0.1', async (thing) => {
+     console.info("I just saw another state-channel node! What does it return here? ", thing)
+  })
+#+end_src
+
+Ok! .remotePeer and .stream should be all we need
+
+#+begin_src js :noweb-ref noSC-handler
+  // Handle messages for the protocol
+   var mylibp2phandler = libp2p.handle('/state-channels/0.0.1', async (conn) => {
+     const { connection, stream } = conn, { remotePeer } = connection
+
+     console.info("I just saw another state-channel node! What does it return here? ", remotePeer, stream, conn)
+  })
+#+end_src
+
+That can then make it very simple.
+
+When we get that message we save the peer and send a/the message back. Of course, if we already have the peer than we can just ignore.
+
+Because we are using a public server, and this may even be the way in the future, we send to every peer, and send a response if we say yes.
+
+This is where we need to figure out streams it seems.
+
+https://github.com/libp2p/js-libp2p/blob/master/examples/protocol-and-stream-muxing/README.md
+
+#+begin_src js :noweb-ref play-with-streams
+  import { pipe } from 'it-pipe'
+  import { map } from 'streaming-iterables'
+  import { toBuffer } from 'it-buffer'
+  import { fromString as uint8ArrayFromString } from 'uint8arrays/from-string'
+  import { toString as uint8ArrayToString } from 'uint8arrays/to-string'
+
+  Object.assign(StateChannels, { pipe, uint8ArrayFromString })
+
+#+end_src
+#+begin_src js :noweb-ref discover-event-listener
+  // Listen for new connections to peers
+     libp2p.connectionManager.addEventListener('peer:connect', (evt) => {
+       const connection = evt.detail, id = connection.remotePeer
+
+       console.log(`Connected to ${id}`)
+       libp2p.dialProtocol(id, '/state-channels/0.0.1').then(stream => {
+         console.log(id.toString(), " has answered")
+
+         const newpeer = new StateChannels.Peer(
+           { id: id.toString(),
+             stdin: stream,
+             libp2p: libp2p
+           })
+
+
+      pipe(
+        [uint8ArrayFromString('from 1 to 2')],
+        stream
+      )
+         }).catch(e => connection.close() );
+
+      // setTimeout(_=>{ connection.close() }, 100)
+     })
+
+
+      // Listen for new peers
+  libp2p.addEventListener('peer:discovery', (evt) => {
+    const peer = evt.detail, id = peer.id.toString()
+    // console.log(`Found peer ${peer.id.toString()}`)
+
+    if (StateChannels.findPeer(id)) {
+      console.log("Already have this peer:", id)
+      return false
+    }
+
+
+    // dial them when we discover them
+    libp2p.dialProtocol(evt.detail.id, '/other-state-channels/0.0.1').then(stream => {
+
+      //stream.close()
+    }).catch(err => {
+ //     log(`Could not dial ${evt.detail.id}`, err, peer)
+    })
+  });
+#+end_src
+
+dfOk, A peer just asked for us to respond.
+
+
+#+begin_src js :noweb-ref SC-handler
+  // Handle messages for the protocol
+   var mylibp2phandler = libp2p.handle('/state-channels/0.0.1', async (conn) => {
+     const { connection, stream } = conn, { remotePeer } = connection,
+           peer = new StateChannels.Peer({
+             id: remotePeer.toString(),
+             stdout: stream,
+             libp2p
+           })
+
+     console.log("handling/answering dial", remotePeer.toString())
+     pipe(
+           stream,
+           async function (source) {
+             for await (const msg of source) {
+               console.log(uint8ArrayToString(msg.subarray()))
+             }
+           }
+
+      )
+   })
+#+end_src
+
+* Conclusion
+
+We now have networking. It seems that storing the stream does not work and we need to re-dial every when communicating.
+
+It could be that we need to store something else. For now we'll replicate state by dialing out to all peers with the new state number AND a hash taken from the state.
+
+* /File/ =js/StateChannels.js=
+
+#+begin_src js :noweb yes :tangle ../js/StateChannels.js
+  const StateChannels = globalThis.StateChannels;
+
+  <<js-peers>>
+
+  export default StateChannels;
+#+end_src
+
+* /File/ =js/index.js=
+
+#+begin_src js :noweb yes :tangle ../js/index.js
+  import { createLibp2p } from 'libp2p'
+  import { webSockets } from '@libp2p/websockets'
+  import { webRTCStar } from '@libp2p/webrtc-star'
+  import { noise } from '@chainsafe/libp2p-noise'
+  import { mplex } from '@libp2p/mplex'
+  import { bootstrap } from '@libp2p/bootstrap'
+
+  import StateChannels from './StateChannels'
+
+  <<play-with-streams>>
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    const wrtcStar = webRTCStar()
+
+    // Create our libp2p node
+    const libp2p = await createLibp2p({
+      start: false,
+      connectionManager: {
+    /**
+     ,* The total number of connections allowed to be open at one time
+     ,*/
+    maxConnections: 10,
+    minConnections: 1,
+      },
+      addresses: {
+        // Add the signaling server address, along with our PeerId to our multiaddrs list
+        // libp2p will automatically attempt to dial to the signaling server so that it can
+        // receive inbound connections from other peers
+        listen: [
+          '/dns4/wrtc-star1.par.dwebops.pub/tcp/443/wss/p2p-webrtc-star',
+          '/dns4/wrtc-star2.sjc.dwebops.pub/tcp/443/wss/p2p-webrtc-star'
+        ]
+      },
+      transports: [
+        webSockets(),
+        wrtcStar.transport
+      ],
+      connectionEncryption: [noise()],
+      streamMuxers: [mplex()],
+      peerDiscovery: [
+        wrtcStar.discovery //,
+        // bootstrap({
+        //   list: [
+        //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
+        //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
+        //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmZa1sAxajnQjVM8WjWXoMbmPd7NsWhfKsPkErzpm9wGkp',
+        //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa',
+        //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt'
+        //   ]
+        // })
+      ]
+    })
+
+    // UI elements
+    const status = document.getElementById('status')
+    const output = document.getElementById('output')
+
+    output.textContent = ''
+
+    function log (txt) {
+      console.info(txt)
+       // output.textContent += `${txt.trim()}\n`
+    }
+
+    <<discover-event-listener>>
+     let conns = []
+          // Listen for peers disconnecting
+     libp2p.connectionManager.addEventListener('peer:disconnect', (evt) => {
+       const connection = evt.detail
+       console.log(`Disconnected from ${connection.remotePeer.toString()}`)
+     })
+
+     <<SC-handler>>
+
+    status.innerText = 'libp2p started!'
+    console.log(`libp2p id is ${libp2p.peerId.toString()}`)
+
+    // Export libp2p to the window so you can play with the API
+    globalThis.libp2p = libp2p
+
+  })
+
+#+end_src

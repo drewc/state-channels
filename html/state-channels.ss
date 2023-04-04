@@ -299,25 +299,17 @@ find-rexpr-method
  
  
 
- function Micropay(...accounts) {
-   const { makeMicropay , Rexpr, rexpr_type } = StateChannels,
-         self = new Rexpr(false, false),
-         proto = Object.create(Object.getPrototypeOf(self))
+   function Micropay(...accounts) {
+     const { makeMicropay , Rexpr, rexpr_type } = StateChannels
+     return makeMicropay(accounts).then(mp => {
+       console.log('Got mp', mp);
+       return new Rexpr(false, mp)
+     });
+   }
  
-   Object.setPrototypeOf(Object.getPrototypeOf(this), proto);
-   Object.setPrototypeOf(self, Object.getPrototypeOf(this));
-   // console.log("Checking Accounts", accounts);
-   makeMicropay(accounts).then(mp => {
-     console.log('Got mp', mp);
-     self.$type = rexpr_type(mp)
-     self.$scm = mp;
-   });
-   return self;
- }
+ //  Micropay.prototype.constructor = Micropay
  
- Micropay.prototype.constructor = Micropay
- 
- globalThis.StateChannels.Micropay = Micropay;
+   globalThis.StateChannels.Micropay = Micropay;
  
 
 EOF
@@ -376,22 +368,22 @@ EOF
 
 
 (begin ;; makeRexpr and the globalThis.StateChannels binding
-  (def (makeRexpr type vslots)
-    (def scm-type (if (string? type) (string->symbol type) type))
-    (def slots '())
-    (vector-for-each
-     (lambda (v)
-       (match v (#(n val)
-                 (set! slots (cons* val (string->symbol n) slots)))))
-     vslots)
-    (set! slots (reverse slots))
-    ;; (displayln "Slots: " slots)
-    (doublewrap (rexpr scm-type `(,@slots))))
+ (def (makeRexpr type vslots)
+   (def scm-type (if (string? type) (string->symbol type) type))
+   (def slots '())
+   (vector-for-each
+    (lambda (v)
+      (match v (#(n val)
+                (set! slots (cons* val (string->symbol n) slots)))))
+    vslots)
+   (set! slots (reverse slots))
+   ;; (displayln "Slots: " slots)
+  (rexpr scm-type `(,@slots)))
 
-    (##inline-host-statement "
-   // alert('inline');
-  window.StateChannels.makeRexpr = @scm2host@(@1@) "
-                             makeRexpr))
+   (##inline-host-statement "
+  // alert('inline');
+ window.StateChannels.makeRexpr = @scm2host@(@1@) "
+                            makeRexpr))
 
 (begin
   (def (make-proch user uid)

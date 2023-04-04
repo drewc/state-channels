@@ -108,7 +108,7 @@
 
 (def html-bin-build-spec
 '((static-exe:
-   "html/state-channels"  bin: "state-channels.js.stripped"
+   "html/state-channels"  bin: "state-channels-gerbil.js.stripped"
    "-target" "js")))
 
 (def (make-html-bin)
@@ -116,7 +116,7 @@
   (add-load-path libdir)
   ;; this action builds the static executables -- no debug introspection
   (make srcdir: srcdir
-        bindir: (path-expand "html" srcdir)
+        bindir: (path-expand "js/public" srcdir)
         libdir: libdir
         verbose: 2
         optimize: #f
@@ -141,3 +141,4 @@
           ["copy-gerbil-state-src"
            "copy-filesocks_dummy"
            "lib" "bin" "node" "browser"]))))
+
