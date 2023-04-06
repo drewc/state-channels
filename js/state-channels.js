@@ -26,8 +26,8 @@ import { toString as uint8ArrayToString } from 'uint8arrays/to-string'
   
   State.prototype.send = function (stream) {
     const vec = uint8ArrayFromString(JSON.stringify(this))
-    console.log("Sending ", this, ' as ', vec, ' over ', stream)
-    return pipe(vec,stream.sink)
+    // console.log("Sending ", this, ' as ', vec, ' over ', stream)
+    return pipe([vec],stream)
   }
   
   State.prototype.recieve = function (stream) {
@@ -41,8 +41,45 @@ import { toString as uint8ArrayToString } from 'uint8arrays/to-string'
                  }).then(_=> state)
     })()
   }
+  State.prototype.protocol = '/state-channels/0.0.1';
   
-  Object.assign(StateChannels, { state: new State() })
+  State.prototype.dial = function (peer) {
+    return libp2p.dialProtocol(peer, this.protocol)
+      .then(stream => {
+        //console.log(peer.toString(), " has answered, giving it ", this)
+        return this.send(stream) // pipe(
+        //   [uint8ArrayFromString(JSON.stringify(this))],
+        //   stream
+        // )
+      })
+  }
+  
+  State.prototype.answer = function (conn) {
+    const { connection, stream } = conn, { remotePeer } = connection;
+    let remote_state;
+    return pipe(
+      stream,
+      async function (source) {
+        for await (const msg of source) {
+          remote_state = uint8ArrayToString(msg.subarray())
+        }
+      }
+    ).then(_=> JSON.parse(remote_state))
+  }
+  
+  State.prototype.merge = function (new_state) {
+    this.sequence = this.sequence + 1;
+    console.log("Have assets: ", this.assets, " and new ", new_state)
+    Object.assign(this.assets, new_state.assets);
+    return this;
+  }
+  
+  
+  
+  
+  
+  
+    Object.assign(StateChannels, { state: new State() })
 
   function Peer(detail = { id: "RemoteId",
                            stdin: "The stream to",

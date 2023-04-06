@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2023-04-04 Tue 16:15 -->
+<!-- 2023-04-05 Wed 14:33 -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>State Channels in Javascript</title>
@@ -231,25 +231,82 @@ First we must include the <code>.js</code> files in the <code>.html</code> file.
 
 <div class="org-src-container">
 <pre class="src src-html">&lt;<span style="color: #82aaff;">script</span> <span style="color: #ffcb6b;">src</span>=<span style="color: #c3e88d;">"state-channels-gerbil.js"</span>&gt;&lt;/<span style="color: #82aaff;">script</span>&gt;
-&lt;<span style="color: #82aaff;">script</span> <span style="color: #ffcb6b;">src</span>=<span style="color: #c3e88d;">"state-channels.js"</span>&gt;&lt;/<span style="color: #82aaff;">script</span>&gt;
+&lt;<span style="color: #82aaff;">script</span> <span style="color: #ffcb6b;">src</span>=<span style="color: #c3e88d;">"state-channels-demo.js"</span>&gt;&lt;/<span style="color: #82aaff;">script</span>&gt;
 </pre>
 </div>
 
-<div id="outline-container-orge262812" class="outline-2">
-<h2 id="orge262812">Shared State</h2>
-<div class="outline-text-2" id="text-orge262812">
+<div id="outline-container-org46a3c9d" class="outline-2">
+<h2 id="org46a3c9d">The <code>demoUI</code> object</h2>
+<div class="outline-text-2" id="text-org46a3c9d">
+<p>
+We've got a file which has the utilities to be able to display things for this demo. It's in <code>state-channels-demo.js</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js">globalThis.demoUI = <span style="color: #c792ea;">{</span>
+  onChange<span style="color: #f78c6c;">(</span>event, key<span style="color: #f78c6c;">)</span> <span style="color: #f78c6c;">{</span>
+    console.log<span style="color: #c3e88d;">(</span><span style="color: #c3e88d;">"Chasnerf:"</span>, event.target.value<span style="color: #c3e88d;">)</span>
+    StateChannels.state.assets<span style="color: #c3e88d;">[</span>key<span style="color: #c3e88d;">]</span> = event.target.value
+    <span style="color: #676E95;">// </span><span style="color: #676E95;">TODO: This should be automated based on events</span>
+    <span style="color: #676E95;">// </span><span style="color: #676E95;">and internal to StateChannels. For now:</span>
+    StateChannels.peers.map<span style="color: #c3e88d;">(</span>p =&gt; <span style="color: #89DDFF;">{</span>
+      StateChannels.state.dial<span style="color: #bb80b3;">(</span>p.connection.remotePeer<span style="color: #bb80b3;">)</span>
+    <span style="color: #89DDFF;">}</span><span style="color: #c3e88d;">)</span>
+  <span style="color: #f78c6c;">}</span>,
+  createStateElement <span style="color: #f78c6c;">(</span>state = StateChannels.state<span style="color: #f78c6c;">)</span> <span style="color: #f78c6c;">{</span>
+  <span style="color: #89DDFF;">const</span> <span style="color: #ffcb6b;">tbl</span> = document.createElement<span style="color: #c3e88d;">(</span><span style="color: #c3e88d;">'table'</span><span style="color: #c3e88d;">)</span>;
+  Object.keys<span style="color: #c3e88d;">(</span>state.assets<span style="color: #c3e88d;">)</span>.forEach<span style="color: #c3e88d;">(</span>k =&gt; <span style="color: #89DDFF;">{</span>
+    <span style="color: #89DDFF;">var</span> <span style="color: #ffcb6b;">inp</span> = document.createElement<span style="color: #bb80b3;">(</span><span style="color: #c3e88d;">'input'</span><span style="color: #bb80b3;">)</span>,
+        tr = document.createElement<span style="color: #bb80b3;">(</span><span style="color: #c3e88d;">'tr'</span><span style="color: #bb80b3;">)</span>,
+        as = state.assets,
+        name = document.createTextNode<span style="color: #bb80b3;">(</span>k<span style="color: #bb80b3;">)</span>,
+        td1 = document.createElement<span style="color: #bb80b3;">(</span><span style="color: #c3e88d;">'td'</span><span style="color: #bb80b3;">)</span>,
+        td2 = document.createElement<span style="color: #bb80b3;">(</span><span style="color: #c3e88d;">'td'</span><span style="color: #bb80b3;">)</span>
+    inp.value = as<span style="color: #bb80b3;">[</span>k<span style="color: #bb80b3;">]</span>;
+    inp.onchange = e =&gt; demoUI.onChange<span style="color: #bb80b3;">(</span>e, k<span style="color: #bb80b3;">)</span>;
+
+      <span style="color: #676E95;">// </span><span style="color: #676E95;">console.log("Input:", inp, " val", inp.value)</span>
+
+    td1.appendChild<span style="color: #bb80b3;">(</span>name<span style="color: #bb80b3;">)</span>; tr.appendChild<span style="color: #bb80b3;">(</span>td1<span style="color: #bb80b3;">)</span>;
+    td2.appendChild<span style="color: #bb80b3;">(</span>inp<span style="color: #bb80b3;">)</span>; tr.appendChild<span style="color: #bb80b3;">(</span>td2<span style="color: #bb80b3;">)</span>;
+    tbl.appendChild<span style="color: #bb80b3;">(</span>tr<span style="color: #bb80b3;">)</span>
+  <span style="color: #89DDFF;">}</span><span style="color: #c3e88d;">)</span>
+  console.log<span style="color: #c3e88d;">(</span>tbl<span style="color: #c3e88d;">)</span>;
+  <span style="color: #89DDFF;">return</span> tbl;
+  <span style="color: #f78c6c;">}</span>,
+  displayState<span style="color: #f78c6c;">(</span>sel = <span style="color: #c3e88d;">'#status'</span><span style="color: #f78c6c;">)</span> <span style="color: #f78c6c;">{</span>
+    <span style="color: #89DDFF;">const</span> <span style="color: #ffcb6b;">myNode</span> = document.querySelector<span style="color: #c3e88d;">(</span>sel<span style="color: #c3e88d;">)</span>;
+    <span style="color: #89DDFF;">while</span> <span style="color: #c3e88d;">(</span>myNode.firstChild<span style="color: #c3e88d;">)</span> <span style="color: #c3e88d;">{</span>
+      myNode.removeChild<span style="color: #89DDFF;">(</span>myNode.lastChild<span style="color: #89DDFF;">)</span>;
+    <span style="color: #c3e88d;">}</span>
+    myNode.appendChild<span style="color: #c3e88d;">(</span>demoUI.createStateElement<span style="color: #89DDFF;">()</span><span style="color: #c3e88d;">)</span>
+
+  <span style="color: #f78c6c;">}</span>
+<span style="color: #c792ea;">}</span>
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orgb434629" class="outline-2">
+<h2 id="orgb434629">Shared State</h2>
+<div class="outline-text-2" id="text-orgb434629">
 <p>
 Open this page in another browser/tab as well as this one. Then repeat the steps for each one.
 </p>
 
 <p>
-Open up the inspector and look at the console.
+Here is the status:
 </p>
 
 <div id="status"></div>
 
 <p>
-Type this command to start the libp2p
+Open up the inspector and look at the console.
+</p>
+
+<p>
+Type this command to start the libp2p :
 </p>
 
 <div class="org-src-container">
@@ -258,14 +315,27 @@ Type this command to start the libp2p
 </div>
 
 <p>
-If you look at the console log you can see where the initial state is exchanged
+OR just:
+</p>
+
+<button onclick="libp2p.start()"> Click Here </button>
+
+<p>
+If you look at the console log you can see some various debugging info. Just wait a while until your browsers see eachother.
+</p>
+
+<p>
+Now the status should be a table of assets. Change a number, exit the &lt;input&gt; (I use TAB) and look at the other browser.
+</p>
+
+<p>
+They should have the same amount in the accounts!
 </p>
 </div>
 </div>
-
-<div id="outline-container-org0279fc5" class="outline-2">
-<h2 id="org0279fc5">Inspector</h2>
-<div class="outline-text-2" id="text-org0279fc5">
+<div id="outline-container-org5e30503" class="outline-2">
+<h2 id="org5e30503">Inspector</h2>
+<div class="outline-text-2" id="text-org5e30503">
 <p>
 The interaction with the <b>State Channels Virtual Machine (SCVM)</b> is contained within the <code>StateChannels</code> global object.
 </p>
@@ -276,9 +346,9 @@ The objects that are shared between the browser, the virtual machine, and potent
 </div>
 </div>
 
-<div id="outline-container-org56d9107" class="outline-2">
-<h2 id="org56d9107">Micropay</h2>
-<div class="outline-text-2" id="text-org56d9107">
+<div id="outline-container-org7a6c2b5" class="outline-2">
+<h2 id="org7a6c2b5">Micropay</h2>
+<div class="outline-text-2" id="text-org7a6c2b5">
 <p>
 Let's start with a <code>Micropay</code> transaction across three peers.
 </p>
@@ -304,9 +374,9 @@ The <code>Micropay</code> contructs a <code>Rexpr</code> of the <code>micropay</
 </div>
 
 
-<div id="outline-container-orga9ad212" class="outline-2">
-<h2 id="orga9ad212">Async <code>Rexpr</code> interaction and Promises</h2>
-<div class="outline-text-2" id="text-orga9ad212">
+<div id="outline-container-orgbe2f54b" class="outline-2">
+<h2 id="orgbe2f54b">Async <code>Rexpr</code> interaction and Promises</h2>
+<div class="outline-text-2" id="text-orgbe2f54b">
 <p>
 Because the <b>SCVM</b> runs outside of the standard <b>JavaScript VM</b> and interacts with the network almost nothing it does is syncronous.
 </p>
@@ -356,9 +426,9 @@ Now following the descibed source block below is the actual HTML it describes. Y
 </div>
 
 
-<div id="outline-container-orgcd39a35" class="outline-2">
-<h2 id="orgcd39a35">The <code>$</code> property prefix</h2>
-<div class="outline-text-2" id="text-orgcd39a35">
+<div id="outline-container-org742c549" class="outline-2">
+<h2 id="org742c549">The <code>$</code> property prefix</h2>
+<div class="outline-text-2" id="text-org742c549">
 <p>
 There are some properties, like <code>$promise</code> for example, that start with the dollar sign. In general, with the exception of the <code>$promise</code> one, these are non-promise properties that are "plain javascript" and not an <b>SCVM</b> interaction.
 </p>
@@ -375,9 +445,9 @@ Here's what we have so far:
 </div>
 </div>
 
-<div id="outline-container-org3ef7b37" class="outline-2">
-<h2 id="org3ef7b37">Method Call</h2>
-<div class="outline-text-2" id="text-org3ef7b37">
+<div id="outline-container-org65cadb5" class="outline-2">
+<h2 id="org65cadb5">Method Call</h2>
+<div class="outline-text-2" id="text-org65cadb5">
 <p>
 All methods return a promise.To call a method we can mostly use the tried and true way. For example a <code>Micropay</code> <code>Rexpr</code> has an <code>lst</code> method that outputs the balance of the accounts to the console.
 </p>
@@ -404,9 +474,9 @@ There are many times when it is useful to know when something has been finished.
 </div>
 </div>
 
-<div id="outline-container-org9253dad" class="outline-2">
-<h2 id="org9253dad">Slot values as properties</h2>
-<div class="outline-text-2" id="text-org9253dad">
+<div id="outline-container-orga39d825" class="outline-2">
+<h2 id="orga39d825">Slot values as properties</h2>
+<div class="outline-text-2" id="text-orga39d825">
 <p>
 In the <b>SCVM</b> an object can have methods associated with a "property" as well as "slots", which are normal values.
 </p>
@@ -428,9 +498,9 @@ stdout<span style="color: #c792ea;">(</span><span style="color: #c3e88d;">"Cerc:
 </div>
 </div>
 
-<div id="outline-container-org9ee2938" class="outline-2">
-<h2 id="org9ee2938">Soliloquy</h2>
-<div class="outline-text-2" id="text-org9ee2938">
+<div id="outline-container-org7aedffc" class="outline-2">
+<h2 id="org7aedffc">Soliloquy</h2>
+<div class="outline-text-2" id="text-org7aedffc">
 <p>
 There's a lot more to come :)
 </p>
@@ -440,31 +510,20 @@ Here's a TODO list
 </p>
 </div>
 
-<div id="outline-container-org2ed96fb" class="outline-3">
-<h3 id="org2ed96fb"><span class="todo TODO">TODO</span> list slots and methods of a <code>Rexpr</code></h3>
+<div id="outline-container-orgaf7cdd7" class="outline-3">
+<h3 id="orgaf7cdd7"><span class="todo TODO">TODO</span> list slots and methods of a <code>Rexpr</code></h3>
 </div>
-<div id="outline-container-org507d14d" class="outline-3">
-<h3 id="org507d14d"><span class="todo TODO">TODO</span> Set propery values of <code>Rexpr</code>'s</h3>
+<div id="outline-container-orgedfebb7" class="outline-3">
+<h3 id="orgedfebb7"><span class="todo TODO">TODO</span> Set propery values of <code>Rexpr</code>'s</h3>
 </div>
-<div id="outline-container-org06e6d92" class="outline-3">
-<h3 id="org06e6d92"><span class="todo TODO">TODO</span> Redo the proc host and individual procs</h3>
-</div>
-</div>
-
-<div id="outline-container-orgab6a46d" class="outline-2">
-<h2 id="orgab6a46d">The <code>state-channels-demo.js</code> file</h2>
-<div class="outline-text-2" id="text-orgab6a46d">
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #89DDFF;">const</span> <span style="color: #c792ea;">{</span> StateChannels <span style="color: #c792ea;">}</span> = globalThis;
-
-</pre>
-</div>
+<div id="outline-container-org1ea28ad" class="outline-3">
+<h3 id="org1ea28ad"><span class="todo TODO">TODO</span> Redo the proc host and individual procs</h3>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Drew Crampsie</p>
-<p class="date">Created: 2023-04-04 Tue 16:15</p>
+<p class="date">Created: 2023-04-05 Wed 14:33</p>
 <p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>

@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       ]
     },
     transports: [
-      webSockets(),
+     // webSockets(),
       wrtcStar.transport
     ],
     connectionEncryption: [noise()],
@@ -72,24 +72,32 @@ document.addEventListener('DOMContentLoaded', async () => {
    // Listen for new connections to peers
       libp2p.connectionManager.addEventListener('peer:connect', (evt) => {
         const connection = evt.detail, id = connection.remotePeer
-        const { state } = StateChannels;
-        console.log(`Connected to ${id}`)
-        libp2p.dialProtocol(id, '/state-channels/0.0.1').then(stream => {
-          console.log(id.toString(), " has answered")
+        const { state, Peer } = StateChannels;
+        console.log(`Connected to ${id}`, state)
+        state.dial(id).then(_=> {
+          const peer = new Peer({ id: id.toString(),
+                                  connection
+                                });
+          return peer
 
-          const newpeer = new StateChannels.Peer(
-            { id: id.toString(),
-              stdin: stream,
-              libp2p: libp2p
-            })
-          pipe(
-            [uint8ArrayFromString(JSON.stringify(state))],
-            stream
-          )
-          console.log ('sent ', state.send(stream));
+          }). catch(e => connection.close())
+        // libp2p.dialProtocol(id, '/state-channels/0.0.1')
+         // .then(stream => {
+        //    console.log(id.toString(), " has answered")
+
+        // //   const newpeer = new StateChannels.Peer(
+        // //     { id: id.toString(),
+        // //       stdin: stream,
+        // //       libp2p: libp2p
+        // //     })
+        //    pipe(
+        //      [uint8ArrayFromString(JSON.stringify(state))],
+        //      stream
+        //    )
+        // //   console.log ('sent ', state.send(stream));
 
 
-          }).catch(e => connection.close() );
+        //    }).catch(e => connection.close() );
 
        // setTimeout(_=>{ connection.close() }, 100)
       })
@@ -123,6 +131,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
    // Handle messages for the protocol
     var mylibp2phandler = libp2p.handle('/state-channels/0.0.1', async (conn) => {
+      const { state } = StateChannels;
+      return state.answer(conn).then (s => {
+        state.merge(s)
+        demoUI.displayState()
+        console.log("Merged State:", state)
+      });
       const { connection, stream } = conn, { remotePeer } = connection,
             peer = new StateChannels.Peer({
               id: remotePeer.toString(),
@@ -149,7 +163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     })
 
-  status.innerText = 'libp2p started!'
+  status.innerText = 'StateChannels started!'
   console.log(`libp2p id is ${libp2p.peerId.toString()}`)
 
   var { StateChannels } = globalThis;

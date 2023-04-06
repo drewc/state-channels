@@ -1,0 +1,847 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2023-03-28 Tue 15:14 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HTML Documentation means testing and refactoring</title>
+<meta name="author" content="Drew Crampsie" />
+<meta name="generator" content="Org Mode" />
+<style>
+  #content { max-width: 60em; margin: auto; }
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #e6e6e6;
+    border-radius: 3px;
+    background-color: #f2f2f2;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    padding: 3px;
+    color: #555;
+    background-color: #f2f2f299;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-authinfo::before { content: 'Authinfo'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { }
+</style>
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">HTML Documentation means testing and refactoring</h1>
+<p>
+After making the <code>StateChannels</code> <b>JavaScript Object</b> we needed something to show the end-user how to use it.
+</p>
+
+<p>
+The <code>html/state-channels.ss</code> will take over from the mp1<sub>1.ss</sub>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><span style="color: #89DDFF;">if</span> <span style="color: #c792ea;">[</span><span style="color: #f78c6c;">[</span> <span style="color: #89DDFF; font-weight: bold;">!</span> -n $<span style="color: #ffcb6b;">SC_SRC</span> <span style="color: #f78c6c;">]</span><span style="color: #c792ea;">]</span>; <span style="color: #89DDFF;">then</span>
+    <span style="color: #82aaff;">export</span> <span style="color: #ffcb6b;">SC_SRC</span>=$<span style="color: #c792ea;">(</span><span style="color: #89DDFF; font-weight: bold;">pwd</span><span style="color: #c792ea;">)</span>
+<span style="color: #89DDFF;">fi</span>
+<span style="color: #82aaff;">cd</span> $<span style="color: #ffcb6b;">SC_SRC</span>; ./bin/make browser
+</pre>
+</div>
+
+
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">html-bin-build-spec</span>
+<span style="color: #89DDFF;">'</span>((<span style="color: #82aaff;">static-exe:</span>
+   <span style="color: #c3e88d;">"html/state-channels"</span>  <span style="color: #82aaff;">bin:</span> <span style="color: #c3e88d;">"state-channels.js.stripped"</span>
+   <span style="color: #c3e88d;">"-target"</span> <span style="color: #c3e88d;">"js"</span>)))
+</pre>
+</div>
+
+<div id="outline-container-org9755c57" class="outline-2">
+<h2 id="org9755c57">Add Rexpr to <code>@scm2host@</code> and <code>@host2scm@</code></h2>
+<div class="outline-text-2" id="text-org9755c57">
+<p>
+There are things that return them and a lot of other reasons why a rexpr can be built that way so let us do it!
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js">  StateChannels.old_scm2host = <span style="color: #c792ea;">(</span>o =&gt; <span style="color: #f78c6c;">{</span>
+    <span style="color: #89DDFF;">return</span> o ? o : @scm2host@
+  <span style="color: #f78c6c;">}</span><span style="color: #c792ea;">)(</span>StateChannels.old_scm2host<span style="color: #c792ea;">)</span>;
+
+  StateChannels.rexpr2host = rexpr =&gt; <span style="color: #c792ea;">{</span>
+    <span style="color: #89DDFF;">return</span> <span style="color: #89DDFF;">new</span> <span style="color: #c792ea;">StateChannels.Rexpr</span><span style="color: #f78c6c;">(</span>rexpr<span style="color: #f78c6c;">)</span>
+  <span style="color: #c792ea;">}</span>
+
+  Object.assign<span style="color: #c792ea;">(</span>StateChannels, <span style="color: #f78c6c;">{</span>
+    listp<span style="color: #c3e88d;">(</span>obj<span style="color: #c3e88d;">)</span> <span style="color: #c3e88d;">{</span> <span style="color: #89DDFF;">return</span> obj <span style="color: #89DDFF;">instanceof</span> @Pair@ || obj === <span style="color: #f78c6c;">null</span> <span style="color: #c3e88d;">}</span>,
+    consp<span style="color: #c3e88d;">(</span>obj<span style="color: #c3e88d;">)</span> <span style="color: #c3e88d;">{</span> <span style="color: #89DDFF;">return</span> obj <span style="color: #89DDFF;">instanceof</span> @Pair@ <span style="color: #c3e88d;">}</span>,
+    car<span style="color: #c3e88d;">(</span>obj<span style="color: #c3e88d;">)</span> <span style="color: #c3e88d;">{</span> <span style="color: #89DDFF;">return</span> StateChannels.consp<span style="color: #89DDFF;">(</span>obj<span style="color: #89DDFF;">)</span> &amp;&amp; obj.a <span style="color: #c3e88d;">}</span>,
+    cdr<span style="color: #c3e88d;">(</span>obj<span style="color: #c3e88d;">)</span> <span style="color: #c3e88d;">{</span> <span style="color: #89DDFF;">return</span> StateChannels.consp<span style="color: #89DDFF;">(</span>obj<span style="color: #89DDFF;">)</span> &amp;&amp; obj.b <span style="color: #c3e88d;">}</span>,
+    symbolp<span style="color: #c3e88d;">(</span>obj<span style="color: #c3e88d;">)</span> <span style="color: #c3e88d;">{</span> <span style="color: #89DDFF;">return</span> obj <span style="color: #89DDFF;">instanceof</span> @ScmSymbol@ <span style="color: #c3e88d;">}</span>,
+    symbol_name <span style="color: #c3e88d;">{</span> <span style="color: #89DDFF;">return</span> symbolp<span style="color: #89DDFF;">(</span>obj<span style="color: #89DDFF;">)</span> &amp;&amp; obj.a <span style="color: #c3e88d;">}</span>
+
+  <span style="color: #f78c6c;">}</span><span style="color: #c792ea;">)</span>
+aget_symbol = <span style="color: #c792ea;">(</span>kons, key<span style="color: #c792ea;">)</span> =&gt; <span style="color: #c792ea;">{</span>
+                <span style="color: #89DDFF;">if</span> <span style="color: #f78c6c;">(</span>!consp<span style="color: #c3e88d;">(</span>kons<span style="color: #c3e88d;">)</span><span style="color: #f78c6c;">)</span> <span style="color: #f78c6c;">{</span> <span style="color: #89DDFF;">return</span> <span style="color: #f78c6c;">}</span>;
+                <span style="color: #89DDFF;">let</span> <span style="color: #ffcb6b;">kar</span> = car<span style="color: #f78c6c;">(</span>kons<span style="color: #f78c6c;">)</span>; <span style="color: #89DDFF;">if</span> <span style="color: #f78c6c;">(</span>!consp<span style="color: #c3e88d;">(</span>kar<span style="color: #c3e88d;">)</span><span style="color: #f78c6c;">)</span> <span style="color: #f78c6c;">{</span><span style="color: #89DDFF;">return</span><span style="color: #f78c6c;">}</span>;
+                <span style="color: #89DDFF;">if</span> <span style="color: #f78c6c;">(</span>car<span style="color: #c3e88d;">(</span>kar<span style="color: #c3e88d;">)</span> === key<span style="color: #f78c6c;">)</span> <span style="color: #f78c6c;">{</span>
+                  <span style="color: #89DDFF;">return</span> kar
+                <span style="color: #f78c6c;">}</span> <span style="color: #89DDFF;">else</span> <span style="color: #f78c6c;">{</span>
+                  <span style="color: #89DDFF;">return</span> aget_symbol<span style="color: #c3e88d;">(</span>cdr<span style="color: #89DDFF;">(</span>kons<span style="color: #89DDFF;">)</span><span style="color: #c3e88d;">)</span>
+                <span style="color: #f78c6c;">}</span>
+              <span style="color: #c792ea;">}</span>
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orgc2a7c98" class="outline-2">
+<h2 id="orgc2a7c98"><i>File</i> <code>html/state-channels.ss</code></h2>
+<div class="outline-text-2" id="text-orgc2a7c98">
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #89DDFF;">export</span> <span style="color: #82aaff;">#t</span>)
+(<span style="color: #89DDFF;">import</span> ../src/runtime)
+(<span style="color: #89DDFF;">import</span> ../src/cli)
+(<span style="color: #89DDFF;">import</span> ../src/apimon)
+(<span style="color: #89DDFF;">import</span> ../examples/mp1)
+
+(<span style="color: #89DDFF;">import</span> <span style="color: #82aaff;">:gerbil/gambit/threads</span>)
+
+(<span style="color: #89DDFF;">define</span> (<span style="color: #82aaff;">main</span> . args)
+  (<span style="color: #82aaff;">##</span>inline-host-declaration <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;">  globalThis.StateChannels = { exit: false }"</span>)
+
+  (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #82aaff;">#</span>&lt;&lt;EOF
+     StateChannels.old<span style="color: #82aaff;">_</span>scm2host = (o <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+       return o <span style="color: #82aaff;">?</span> o : @scm2host@
+     <span style="color: #ffcb6b;">}</span>)(StateChannels.old<span style="color: #82aaff;">_</span>scm2host)<span style="color: #676E95;">;</span>
+
+     StateChannels.rexpr2host = rexpr <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+       return new StateChannels.Rexpr(rexpr)
+     <span style="color: #ffcb6b;">}</span>
+
+     Object.assign(StateChannels<span style="color: #89DDFF;">,</span> <span style="color: #ffcb6b;">{</span>
+       listp(obj) <span style="color: #ffcb6b;">{</span> return obj instanceof @Pair@ <span style="color: #c3e88d;">||</span> obj === null <span style="color: #ffcb6b;">}</span><span style="color: #89DDFF;">,</span>
+       consp(obj) <span style="color: #ffcb6b;">{</span> return obj instanceof @Pair@ <span style="color: #ffcb6b;">}</span><span style="color: #89DDFF;">,</span>
+       car(obj) <span style="color: #ffcb6b;">{</span> return StateChannels.consp(obj) <span style="color: #82aaff;">&amp;&amp;</span> obj.a <span style="color: #ffcb6b;">}</span><span style="color: #89DDFF;">,</span>
+       cdr(obj) <span style="color: #ffcb6b;">{</span> return StateChannels.consp(obj) <span style="color: #82aaff;">&amp;&amp;</span> obj.b <span style="color: #ffcb6b;">}</span><span style="color: #89DDFF;">,</span>
+       symbolp(obj) <span style="color: #ffcb6b;">{</span> return obj instanceof @ScmSymbol@ <span style="color: #ffcb6b;">}</span><span style="color: #89DDFF;">,</span>
+       symbol<span style="color: #82aaff;">_</span>name <span style="color: #ffcb6b;">{</span> return symbolp(obj) <span style="color: #82aaff;">&amp;&amp;</span> obj.a <span style="color: #ffcb6b;">}</span>
+
+     <span style="color: #ffcb6b;">}</span>)
+   aget<span style="color: #82aaff;">_</span>symbol = (kons<span style="color: #89DDFF;">,</span> key) <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+                   if (<span style="color: #82aaff;">!</span>consp(kons)) <span style="color: #ffcb6b;">{</span> return <span style="color: #ffcb6b;">}</span><span style="color: #676E95;">;</span>
+                   let kar = car(kons)<span style="color: #676E95;">; </span><span style="color: #676E95;">if (!consp(kar)) {return};</span>
+                   if (car(kar) === key) <span style="color: #ffcb6b;">{</span>
+                     return kar
+                   <span style="color: #ffcb6b;">}</span> else <span style="color: #ffcb6b;">{</span>
+                     return aget<span style="color: #82aaff;">_</span>symbol(cdr(kons))
+                   <span style="color: #ffcb6b;">}</span>
+                 <span style="color: #ffcb6b;">}</span>
+
+EOF
+)
+
+  (<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">call-method-using-string</span> str obj . args)
+    (<span style="color: #89DDFF;">apply</span> mcall (string-&gt;symbol str) obj args))
+
+(<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;">   window.StateChannels.cr = () =&gt; @async_call@(false, false, @2@, []);</span>
+<span style="color: #c3e88d;">    window.StateChannels.mcall = (meth, obj, ...args) =&gt; {</span>
+<span style="color: #c3e88d;">      const xargs = @host2scm@(args);</span>
+<span style="color: #c3e88d;">      return @async_call@(false, false, @1@,[@host2scm@(meth), obj, ...xargs])</span>
+<span style="color: #c3e88d;">    };"</span> call-method-using-string cr)
+
+
+ (<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">property-value</span> obj name)
+   (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">sym</span> (<span style="color: #89DDFF;">if</span> (symbol? name) name (string-&gt;symbol name)))
+   (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">val</span> (: obj name))
+   (<span style="color: #89DDFF;">if</span> (unspecified? val) (method (typeof obj) sym)))
+
+ (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"window.StateChannels.foreign = @host2foreign@"</span>)
+ (<span style="color: #82aaff;">##</span>inline-host-statement
+  <span style="color: #c3e88d;">"window.StateChannels.propertyValue = (obj, name) =&gt;</span>
+<span style="color: #c3e88d;">     @async_call@(true, false, @1@, [obj, @host2scm@(name)])"</span>
+  property-value)
+(<span style="color: #89DDFF;">begin</span>
+  (<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">makeMicropay</span> accounts)
+    (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">args</span> <span style="color: #89DDFF;">'</span>())
+    (vector-for-each
+     (<span style="color: #89DDFF;">lambda</span> (v)
+       (<span style="color: #89DDFF;">match</span> v (<span style="color: #82aaff;">#</span>(str n)
+                 (<span style="color: #89DDFF;">set!</span> args (cons* n (string-&gt;symbol str) args)))))
+     accounts)
+    (<span style="color: #89DDFF;">set!</span> args (reverse args))
+    (<span style="color: #89DDFF;">let*</span> ((mp (<span style="color: #89DDFF;">apply</span> micropay args))
+           (f  (<span style="color: #82aaff;">##</span>inline-host-expression <span style="color: #c3e88d;">"@host2foreign@(@1@)"</span> mp)))
+      (<span style="color: #82aaff;">##</span>inline-host-expression <span style="color: #c3e88d;">"@host2foreign@(@1@)"</span> f)))
+  (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;">  window.StateChannels.makeMicropay = @scm2host@(@1@) "</span>
+                          makeMicropay))
+
+
+(<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">doublewrap</span> obj)
+   (<span style="color: #82aaff;">##</span>inline-host-expression <span style="color: #c3e88d;">"@host2foreign@(@host2foreign@(@1@))"</span> obj))
+
+(<span style="color: #89DDFF;">begin</span>
+  (<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">slot-value</span> obj name)
+    (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">sym</span> (<span style="color: #89DDFF;">if</span> (symbol? name) name (string-&gt;symbol name)))
+    (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">val</span> (: obj sym))
+    <span style="color: #676E95;">;; </span><span style="color: #676E95;">(displayln "This is the obj: " obj " and sym " sym )</span>
+  <span style="color: #676E95;">#;(displayln "fudge? :"  val " and " (: obj sym)</span>
+<span style="color: #676E95;">              " but" (##inline-host-expression</span>
+<span style="color: #676E95;">                      "console.log('huh?',@1@, @scm2host@(@1@), '_y ', _stringp(@1@)) " val)</span><span style="color: #676E95;">)</span>
+    (<span style="color: #89DDFF;">if</span> (<span style="color: #89DDFF;">not</span> (unspecified? val)) (doublewrap val)))
+(<span style="color: #82aaff;">##</span>inline-host-statement
+  <span style="color: #c3e88d;">"window.StateChannels.slotValue = (obj, name, scm = false) =&gt;</span>
+<span style="color: #c3e88d;">     @async_call@(true, false, @1@, [obj, @host2scm@(name)])</span>
+<span style="color: #c3e88d;">        .then(r =&gt; { return scm ? r : @scm2host@(r); })"</span>
+  slot-value))
+(<span style="color: #89DDFF;">begin</span>
+(<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">slot-method?</span> obj name)
+  (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">sym</span> (<span style="color: #89DDFF;">if</span> (symbol? name) name (string-&gt;symbol name)))
+  (method (typeof obj) sym))
+(<span style="color: #82aaff;">##</span>inline-host-statement
+ <span style="color: #c3e88d;">"window.StateChannels.hasMethod = (obj, name) =&gt;</span>
+<span style="color: #c3e88d;">   @async_call@(true, false, @1@, [obj, @host2scm@(name)])"</span>
+ slot-method?))
+
+
+(<span style="color: #89DDFF;">begin</span> <span style="color: #676E95;">;; </span><span style="color: #676E95;">makeRexpr and the globalThis.StateChannels binding</span>
+  (<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">makeRexpr</span> type vslots)
+    (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">scm-type</span> (<span style="color: #89DDFF;">if</span> (string? type) (string-&gt;symbol type) type))
+    (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">slots</span> <span style="color: #89DDFF;">'</span>())
+    (vector-for-each
+     (<span style="color: #89DDFF;">lambda</span> (v)
+       (<span style="color: #89DDFF;">match</span> v (<span style="color: #82aaff;">#</span>(n val)
+                 (<span style="color: #89DDFF;">set!</span> slots (cons* val (string-&gt;symbol n) slots)))))
+     vslots)
+    (<span style="color: #89DDFF;">set!</span> slots (reverse slots))
+    <span style="color: #676E95;">;; </span><span style="color: #676E95;">(displayln "Slots: " slots)</span>
+    (doublewrap (rexpr scm-type <span style="color: #89DDFF;">`</span>(<span style="color: #89DDFF;">,</span>@slots))))
+
+    (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;">   // alert('inline');</span>
+<span style="color: #c3e88d;">  window.StateChannels.makeRexpr = @scm2host@(@1@) "</span>
+                             makeRexpr))
+
+(<span style="color: #89DDFF;">begin</span>
+  (<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">make-proch</span> user uid)
+    (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">usym</span> (<span style="color: #89DDFF;">if</span> (string? user) (string-&gt;symbol user) user))
+    (<span style="color: #89DDFF;">let</span> ((h (proch <span style="color: #89DDFF;">'</span>USER usym <span style="color: #89DDFF;">'</span>UID uid)))
+      <span style="color: #676E95;">;;</span><span style="color: #676E95;">(displayln "Have Proch" h)</span>
+      (doublewrap h)))
+  (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;">globalThis.StateChannels.makeProcHost = (user, uid) =&gt;</span>
+<span style="color: #c3e88d;"> @async_call@(true, false, @1@, [@host2scm@(user), @host2scm@(uid)]).then(h =&gt; {</span>
+<span style="color: #c3e88d;">    //console.log('Have return', h);</span>
+<span style="color: #c3e88d;">    return h</span>
+<span style="color: #c3e88d;"> });"</span>
+                           make-proch))
+
+ (<span style="color: #89DDFF;">begin</span>
+   (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;"> globalThis.StateChannels.currentProcHost = (proc = false) =&gt; {</span>
+<span style="color: #c3e88d;">   const scm = proc instanceof Rexpr ? proc.$scm : proc</span>
+<span style="color: #c3e88d;">   return @async_call@(false, false, @1@, proc ? [scm] : []);</span>
+<span style="color: #c3e88d;">};"</span>
+                            current-proch!))
+
+  (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;">  _async_call_scm = function (need_result, thread_scm, proc_scm, args_scm) {</span>
+
+<span style="color: #c3e88d;">  var promise = new Promise(function (resolve, reject) {</span>
+
+<span style="color: #c3e88d;">    function done(err, result) {</span>
+<span style="color: #c3e88d;">      if (err !== null) {</span>
+<span style="color: #c3e88d;">        reject(new Error(err));</span>
+<span style="color: #c3e88d;">      } else {</span>
+<span style="color: #c3e88d;">        resolve(result);</span>
+<span style="color: #c3e88d;">      }</span>
+<span style="color: #c3e88d;">    };</span>
+
+<span style="color: #c3e88d;">    args_scm.unshift(proc_scm);               // procedure to call</span>
+
+<span style="color: #c3e88d;">    if (need_result) {</span>
+<span style="color: #c3e88d;">      args_scm.unshift(_function2scm(done)); // Scheme callback for result</span>
+<span style="color: #c3e88d;">    } else {</span>
+<span style="color: #c3e88d;">      args_scm.unshift(_host2scm(false));    // no result needed</span>
+<span style="color: #c3e88d;">      done(null, _host2scm(void 0));         // cause #!void to be returned</span>
+<span style="color: #c3e88d;">    }</span>
+
+<span style="color: #c3e88d;">    args_scm.unshift(thread_scm);             // run in specific thread</span>
+
+<span style="color: #c3e88d;">    _callback_queue.write(args_scm);</span>
+<span style="color: #c3e88d;">  });</span>
+
+<span style="color: #c3e88d;">  return promise;</span>
+<span style="color: #c3e88d;">};</span>
+<span style="color: #c3e88d;">"</span>)
+(<span style="color: #89DDFF;">begin</span>
+  (<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">make-procla</span> user uid self)
+    (displayln <span style="color: #c3e88d;">"Make Procl"</span> user uid self)
+    (<span style="color: #89DDFF;">let</span> ((h (procl <span style="color: #89DDFF;">'</span>USER user <span style="color: #89DDFF;">'</span>UID uid <span style="color: #89DDFF;">'</span>SELF self)))
+      (displayln <span style="color: #c3e88d;">"Have Procl : "</span> h)
+      h
+      <span style="color: #676E95;">#;(doublewrap h</span><span style="color: #676E95;">)</span>))
+    (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;">globalThis.StateChannels.makeProcLa = (user, uid, self) =&gt; {</span>
+<span style="color: #c3e88d;">const { Rexpr } = StateChannels;</span>
+<span style="color: #c3e88d;"> const scm = self instanceof Rexpr ? self.$scm : self ;</span>
+<span style="color: #c3e88d;"> return @async_call_scm@(true, false, @1@,</span>
+<span style="color: #c3e88d;">  [@host2scm@(user), @host2scm@(uid), scm]);</span>
+<span style="color: #c3e88d;">};"</span>
+                           list)
+  (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;">globalThis.StateChannels.makeProcL = (user, uid, self) =&gt; {</span>
+<span style="color: #c3e88d;">const { Rexpr } = StateChannels;</span>
+<span style="color: #c3e88d;"> const scm = self instanceof Rexpr ? self.$scm : self ;</span>
+<span style="color: #c3e88d;"> return @async_call_scm@(true, false, @1@,</span>
+<span style="color: #c3e88d;">  [@host2scm@(user), @host2scm@(uid), scm]);</span>
+<span style="color: #c3e88d;">};"</span>
+                           make-procla))
+ (<span style="color: #89DDFF;">begin</span>
+   (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;"> globalThis.StateChannels.netEnter = (proc) =&gt; {</span>
+<span style="color: #c3e88d;">   const scm = proc instanceof Rexpr ? proc.$scm : proc</span>
+<span style="color: #c3e88d;">   return @async_call@(false, false, @1@, proc ? [scm] : []);</span>
+<span style="color: #c3e88d;">};"</span>
+                            net-enter))
+
+(<span style="color: #89DDFF;">begin</span>
+  (<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">make-ProcGroupAndAttach</span> procs (first Void))
+    (<span style="color: #89DDFF;">let</span> ((h (<span style="color: #89DDFF;">apply</span> proc-group+attach first procs)))
+      <span style="color: #676E95;">;;</span><span style="color: #676E95;">(displayln "Have Proch" h)</span>
+      (doublewrap h)))
+  (<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #c3e88d;">"</span>
+<span style="color: #c3e88d;">globalThis.StateChannels.makeProcGroupAndAttach = (procs) =&gt; {</span>
+<span style="color: #c3e88d;"> const { Rexpr } = StateChannels;</span>
+<span style="color: #c3e88d;"> const scms = procs.map(self =&gt; self instanceof Rexpr ? self.$scm : self) ;</span>
+<span style="color: #c3e88d;"> return @async_call@(true, false, @1@, procs);</span>
+<span style="color: #c3e88d;"> };"</span>
+                           make-ProcGroupAndAttach))
+
+(<span style="color: #82aaff;">##</span>inline-host-statement <span style="color: #82aaff;">#</span>&lt;&lt;EOF
+function Rexpr (type = <span style="color: #c3e88d;">"@@rexpr"</span><span style="color: #89DDFF;">,</span> obj = <span style="color: #ffcb6b;">{}</span>) <span style="color: #ffcb6b;">{</span>
+  const <span style="color: #ffcb6b;">{</span> makeRexpr <span style="color: #ffcb6b;">}</span> = StateChannels <span style="color: #676E95;">;</span>
+  // console.log(<span style="color: #c3e88d;">"Make Rexpr?"</span><span style="color: #89DDFF;">,</span> makeRexpr)
+  if (<span style="color: #82aaff;">!</span>type) <span style="color: #ffcb6b;">{</span>
+    this.$scm = obj
+  <span style="color: #ffcb6b;">}</span> else if (typeof type === <span style="color: #89DDFF;">'</span>object<span style="color: #89DDFF;">'</span> <span style="color: #82aaff;">&amp;&amp;</span> <span style="color: #82aaff;">!</span>(type instanceof RexprType)) <span style="color: #ffcb6b;">{</span>
+    this.$scm = type
+  <span style="color: #ffcb6b;">}</span> else <span style="color: #ffcb6b;">{</span>
+    makeRexpr(type<span style="color: #89DDFF;">,</span> Object.entries(obj)).then(r <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span> this.$scm = r <span style="color: #ffcb6b;">}</span>)
+  <span style="color: #ffcb6b;">}</span>
+  return this.proxify()<span style="color: #676E95;">;</span>
+<span style="color: #ffcb6b;">}</span><span style="color: #676E95;">;</span>
+
+function RexprType(type) <span style="color: #ffcb6b;">{</span>
+  Object.assign(this<span style="color: #89DDFF;">,</span> type)<span style="color: #676E95;">;</span>
+  return this<span style="color: #676E95;">;</span>
+<span style="color: #ffcb6b;">}</span>
+const promiseProxy = (prom) <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+  return new Proxy(() <span style="color: #82aaff;">=&gt;</span> prom<span style="color: #89DDFF;">,</span> <span style="color: #ffcb6b;">{</span>
+    <span style="color: #82aaff;">get:</span> function(target<span style="color: #89DDFF;">,</span> prop) <span style="color: #ffcb6b;">{</span>
+      var value = target()<span style="color: #ffcb6b;">[</span>prop<span style="color: #ffcb6b;">]</span><span style="color: #676E95;">;</span>
+      return typeof value == <span style="color: #89DDFF;">'</span>function<span style="color: #89DDFF;">'</span> <span style="color: #82aaff;">?</span> value.bind(target()) : value<span style="color: #676E95;">;</span>
+    <span style="color: #ffcb6b;">}</span><span style="color: #89DDFF;">,</span>
+    <span style="color: #82aaff;">apply:</span> function(target<span style="color: #89DDFF;">,</span> thisArg<span style="color: #89DDFF;">,</span> argumentsList) <span style="color: #ffcb6b;">{</span>
+      return target().then(f <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+        if (typeof f === <span style="color: #89DDFF;">'</span>function<span style="color: #89DDFF;">'</span>) <span style="color: #ffcb6b;">{</span>
+          return f(<span style="color: #82aaff;">...</span>argumentsList)
+        <span style="color: #ffcb6b;">}</span> else <span style="color: #ffcb6b;">{</span> return f <span style="color: #ffcb6b;">}</span>
+      <span style="color: #ffcb6b;">}</span>)
+  <span style="color: #ffcb6b;">}</span>
+  <span style="color: #ffcb6b;">}</span>)
+<span style="color: #ffcb6b;">}</span><span style="color: #676E95;">;</span>
+
+const makeRexprHandler = (obj) <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+   const proto = Object.getPrototypeOf(obj)<span style="color: #676E95;">;</span>
+  return <span style="color: #ffcb6b;">{</span>
+    getPrototypeOf(target) <span style="color: #ffcb6b;">{</span> return proto <span style="color: #676E95;">; </span><span style="color: #676E95;">},</span>
+    get(target<span style="color: #89DDFF;">,</span> prop<span style="color: #89DDFF;">,</span> rec) <span style="color: #ffcb6b;">{</span>
+     // console.log(<span style="color: #c3e88d;">"target:"</span><span style="color: #89DDFF;">,</span> target)
+      if (Object.hasOwn(target<span style="color: #89DDFF;">,</span> prop) <span style="color: #c3e88d;">||</span> prop.startsWith(<span style="color: #89DDFF;">'</span>$<span style="color: #89DDFF;">'</span>)) <span style="color: #ffcb6b;">{</span>
+        console.warn(<span style="color: #c3e88d;">"Accessing "</span><span style="color: #89DDFF;">,</span> prop<span style="color: #89DDFF;">,</span> <span style="color: #c3e88d;">" In"</span><span style="color: #89DDFF;">,</span> target)
+         return Reflect.get(<span style="color: #82aaff;">...</span>arguments)<span style="color: #676E95;">;</span>
+      <span style="color: #ffcb6b;">}</span> else <span style="color: #ffcb6b;">{</span>
+      return promiseProxy(StateChannels.slotValue(target.$scm<span style="color: #89DDFF;">,</span> prop)
+        .then(val <span style="color: #82aaff;">=&gt;</span> typeof val <span style="color: #82aaff;">!</span>== <span style="color: #c3e88d;">"undefined"</span> <span style="color: #82aaff;">?</span> val :
+              StateChannels.hasMethod(target.$scm<span style="color: #89DDFF;">,</span> prop)
+              .then(meth <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+                if (typeof meth === <span style="color: #c3e88d;">"undefined"</span>) <span style="color: #ffcb6b;">{</span>
+                  Reflect.get(proto<span style="color: #89DDFF;">,</span> prop<span style="color: #89DDFF;">,</span> rec)<span style="color: #676E95;">;</span>
+                <span style="color: #ffcb6b;">}</span> else <span style="color: #ffcb6b;">{</span>
+                  return (<span style="color: #82aaff;">...</span>args) <span style="color: #82aaff;">=&gt;</span> StateChannels.mcall(prop<span style="color: #89DDFF;">,</span> target.$scm<span style="color: #89DDFF;">,</span> <span style="color: #82aaff;">...</span>args)<span style="color: #676E95;">;</span>
+                <span style="color: #ffcb6b;">}</span>
+              <span style="color: #ffcb6b;">}</span>)
+             )
+                         )
+      <span style="color: #ffcb6b;">}</span>
+    <span style="color: #ffcb6b;">}</span>
+  <span style="color: #ffcb6b;">}</span>
+<span style="color: #ffcb6b;">}</span>
+
+const proxifyRexpr = (obj) <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+  const handler = makeRexprHandler(obj)<span style="color: #676E95;">;</span>
+  const prox = new Proxy(obj<span style="color: #89DDFF;">,</span> handler)<span style="color: #676E95;">;</span>
+  return prox<span style="color: #676E95;">;</span>
+<span style="color: #ffcb6b;">}</span>
+
+ Rexpr.prototype.proxify = function () <span style="color: #ffcb6b;">{</span>
+    return proxifyRexpr(this)<span style="color: #676E95;">;</span>
+ <span style="color: #ffcb6b;">}</span>
+
+
+globalThis.StateChannels.Rexpr = Rexpr
+Rexpr.prototype.$slot = function (id) <span style="color: #ffcb6b;">{</span>
+  return StateChannels.slotValue(this.$scm<span style="color: #89DDFF;">,</span> id<span style="color: #89DDFF;">,</span> true)
+<span style="color: #ffcb6b;">}</span>
+
+function Micropay(<span style="color: #82aaff;">...</span>accounts) <span style="color: #ffcb6b;">{</span>
+  const <span style="color: #ffcb6b;">{</span> makeMicropay <span style="color: #89DDFF;">,</span> Rexpr <span style="color: #ffcb6b;">}</span> = StateChannels<span style="color: #676E95;">;</span>
+  this.$proxy = Rexpr.call(this<span style="color: #89DDFF;">,</span> false)<span style="color: #676E95;">;</span>
+  const self = this
+  this.$promise = makeMicropay(accounts).then(m <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+    self.$scm = m
+    return true
+    <span style="color: #ffcb6b;">}</span>).catch((e) <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span> self.$error = e <span style="color: #676E95;">; </span><span style="color: #676E95;">return false })</span>
+  Object.setPrototypeOf(this<span style="color: #89DDFF;">,</span> Object.create(this.$proxy))
+  return this
+<span style="color: #ffcb6b;">}</span>
+Micropay.prototype = Object.create(Rexpr.prototype)<span style="color: #676E95;">;</span>
+Micropay.prototype.constructor = Micropay
+
+globalThis.StateChannels.Micropay = Micropay<span style="color: #676E95;">;</span>
+function ProcHost(slots) <span style="color: #ffcb6b;">{</span>
+  const <span style="color: #ffcb6b;">{</span> makeProcHost <span style="color: #89DDFF;">,</span> Rexpr <span style="color: #ffcb6b;">}</span> = StateChannels<span style="color: #676E95;">;</span>
+  this.$proxy = Rexpr.call(this<span style="color: #89DDFF;">,</span> false)<span style="color: #676E95;">;</span>
+  this.$promise = makeProcHost(slots.user<span style="color: #89DDFF;">,</span> slots.uid).then(m <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+    // console.log(<span style="color: #c3e88d;">"Hve m "</span><span style="color: #89DDFF;">,</span> m<span style="color: #89DDFF;">,</span> <span style="color: #c3e88d;">"For This"</span><span style="color: #89DDFF;">,</span> this)
+    this.$scm = m
+    return true
+    <span style="color: #ffcb6b;">}</span>).catch((e) <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span> this.$error = e <span style="color: #676E95;">; </span><span style="color: #676E95;">return false })</span>
+  Object.setPrototypeOf(this<span style="color: #89DDFF;">,</span> Object.create(this.$proxy))
+  return this
+<span style="color: #ffcb6b;">}</span>
+ProcHost.prototype = Object.create(Rexpr.prototype)<span style="color: #676E95;">;</span>
+ProcHost.prototype.constructor = ProcHost
+
+globalThis.StateChannels.ProcHost = ProcHost<span style="color: #676E95;">;</span>
+function ProcL(slots) <span style="color: #ffcb6b;">{</span>
+  const <span style="color: #ffcb6b;">{</span> makeProcL <span style="color: #89DDFF;">,</span> Rexpr <span style="color: #ffcb6b;">}</span> = StateChannels<span style="color: #676E95;">;</span>
+  this.$proxy = Rexpr.call(this<span style="color: #89DDFF;">,</span> false)<span style="color: #676E95;">;</span>
+  this.$promise = makeProcL(slots.user<span style="color: #89DDFF;">,</span> slots.uid<span style="color: #89DDFF;">,</span> slots.self).then(m <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+    console.log(<span style="color: #c3e88d;">"Have Procl "</span><span style="color: #89DDFF;">,</span> m<span style="color: #89DDFF;">,</span> <span style="color: #c3e88d;">"For This"</span><span style="color: #89DDFF;">,</span> this)
+    this.$scm = m
+    return true
+    <span style="color: #ffcb6b;">}</span>).catch((e) <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span> this.$error = e <span style="color: #676E95;">; </span><span style="color: #676E95;">throw e })</span>
+ // Object.setPrototypeOf(this<span style="color: #89DDFF;">,</span> Object.create(this.$proxy))
+  return this.$proxy
+<span style="color: #ffcb6b;">}</span>
+ProcL.prototype = Object.create(Rexpr.prototype)<span style="color: #676E95;">;</span>
+ProcL.prototype.constructor = ProcL
+
+globalThis.StateChannels.ProcL = ProcL<span style="color: #676E95;">;</span>
+function ProcGroupAndAttach(<span style="color: #82aaff;">...</span>procs) <span style="color: #ffcb6b;">{</span>
+  const <span style="color: #ffcb6b;">{</span> makeProcGroupAndAttach <span style="color: #89DDFF;">,</span> Rexpr <span style="color: #ffcb6b;">}</span> = StateChannels<span style="color: #676E95;">;</span>
+  this.$proxy = Rexpr.call(this<span style="color: #89DDFF;">,</span> false)<span style="color: #676E95;">;</span>
+  this.$promise = makeProcGroupAndAttach(procs).then(m <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+    // console.log(<span style="color: #c3e88d;">"Hve m "</span><span style="color: #89DDFF;">,</span> m<span style="color: #89DDFF;">,</span> <span style="color: #c3e88d;">"For This"</span><span style="color: #89DDFF;">,</span> this)
+    this.$scm = m
+    return true
+    <span style="color: #ffcb6b;">}</span>).catch((e) <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span> this.$error = e <span style="color: #676E95;">; </span><span style="color: #676E95;">return false })</span>
+  Object.setPrototypeOf(this<span style="color: #89DDFF;">,</span> Object.create(this.$proxy))
+  return this
+<span style="color: #ffcb6b;">}</span>
+ProcGroupAndAttach.prototype = Object.create(Rexpr.prototype)<span style="color: #676E95;">;</span>
+ProcGroupAndAttach.prototype.constructor = ProcGroupAndAttach
+
+globalThis.StateChannels.ProcGroupAndAttach = ProcGroupAndAttach<span style="color: #676E95;">;</span>
+globalThis.main = async () <span style="color: #82aaff;">=&gt;</span> <span style="color: #ffcb6b;">{</span>
+    // <span style="color: #676E95;">;; </span><span style="color: #676E95;">Creating the proc snapshots</span>
+  const MP1 = new Micropay(<span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"smith"</span><span style="color: #89DDFF;">,</span> 10<span style="color: #ffcb6b;">]</span><span style="color: #89DDFF;">,</span> <span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"dupont"</span><span style="color: #89DDFF;">,</span> 10<span style="color: #ffcb6b;">]</span><span style="color: #89DDFF;">,</span> <span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"durand"</span><span style="color: #89DDFF;">,</span> 10<span style="color: #ffcb6b;">]</span>)<span style="color: #89DDFF;">,</span>
+        MP2 = new Micropay(<span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"smith"</span><span style="color: #89DDFF;">,</span> 10<span style="color: #ffcb6b;">]</span><span style="color: #89DDFF;">,</span> <span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"dupont"</span><span style="color: #89DDFF;">,</span> 10<span style="color: #ffcb6b;">]</span><span style="color: #89DDFF;">,</span> <span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"durand"</span><span style="color: #89DDFF;">,</span> 10<span style="color: #ffcb6b;">]</span>)<span style="color: #89DDFF;">,</span>
+        MP3 = new Micropay(<span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"smith"</span><span style="color: #89DDFF;">,</span> 10<span style="color: #ffcb6b;">]</span><span style="color: #89DDFF;">,</span> <span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"dupont"</span><span style="color: #89DDFF;">,</span> 10<span style="color: #ffcb6b;">]</span><span style="color: #89DDFF;">,</span> <span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"durand"</span><span style="color: #89DDFF;">,</span> 10<span style="color: #ffcb6b;">]</span>)<span style="color: #676E95;">;</span>
+
+  console.log(<span style="color: #c3e88d;">"Have MPS:"</span><span style="color: #89DDFF;">,</span> MP1<span style="color: #89DDFF;">,</span> MP2<span style="color: #89DDFF;">,</span> MP3)
+  let HOST1<span style="color: #89DDFF;">,</span> PR1<span style="color: #89DDFF;">,</span> PR2<span style="color: #89DDFF;">,</span> PR3<span style="color: #89DDFF;">,</span> GR1<span style="color: #676E95;">;</span>
+  const <span style="color: #ffcb6b;">{</span> cr <span style="color: #ffcb6b;">}</span> = StateChannels<span style="color: #676E95;">;</span>
+  await MP1.$promise<span style="color: #676E95;">; </span><span style="color: #676E95;">MP1.lst().then(cr);</span>
+  await MP2.$promise<span style="color: #676E95;">; </span><span style="color: #676E95;">MP2.lst().then(cr);</span>
+  await MP3.$promise<span style="color: #676E95;">; </span><span style="color: #676E95;">MP3.lst().then(cr);</span>
+
+  let <span style="color: #ffcb6b;">{</span> currentProcHost<span style="color: #89DDFF;">,</span> ProcHost <span style="color: #ffcb6b;">}</span> = StateChannels<span style="color: #676E95;">;</span>
+
+  HOST1 = new ProcHost(<span style="color: #ffcb6b;">{</span> <span style="color: #82aaff;">name:</span> <span style="color: #c3e88d;">"system"</span><span style="color: #89DDFF;">,</span> <span style="color: #82aaff;">uid:</span> <span style="color: #c3e88d;">"host1"</span><span style="color: #ffcb6b;">}</span>)<span style="color: #676E95;">;</span>
+  await HOST1.$promise <span style="color: #676E95;">; </span><span style="color: #676E95;">currentProcHost(HOST1);</span>
+
+
+  let <span style="color: #ffcb6b;">{</span> ProcL<span style="color: #89DDFF;">,</span> netEnter <span style="color: #ffcb6b;">}</span> = StateChannels<span style="color: #676E95;">;</span>
+  PR1 = new ProcL(<span style="color: #ffcb6b;">{</span> <span style="color: #82aaff;">user:</span> <span style="color: #c3e88d;">"smith"</span><span style="color: #89DDFF;">,</span> <span style="color: #82aaff;">uid:</span> <span style="color: #c3e88d;">"PR1"</span><span style="color: #89DDFF;">,</span> <span style="color: #82aaff;">self:</span> MP1<span style="color: #ffcb6b;">}</span>)
+  PR2 = new ProcL(<span style="color: #ffcb6b;">{</span> <span style="color: #82aaff;">user:</span> <span style="color: #c3e88d;">"dupont"</span><span style="color: #89DDFF;">,</span> <span style="color: #82aaff;">uid:</span> <span style="color: #c3e88d;">"PR2"</span><span style="color: #89DDFF;">,</span> <span style="color: #82aaff;">self:</span> MP2<span style="color: #ffcb6b;">}</span>)
+  PR3 = new ProcL(<span style="color: #ffcb6b;">{</span> <span style="color: #82aaff;">user:</span> <span style="color: #c3e88d;">"durand"</span><span style="color: #89DDFF;">,</span> <span style="color: #82aaff;">uid:</span> <span style="color: #c3e88d;">"PR3"</span><span style="color: #89DDFF;">,</span> <span style="color: #82aaff;">self:</span> MP3<span style="color: #ffcb6b;">}</span>)
+
+  await PR1.$promise<span style="color: #676E95;">; </span><span style="color: #676E95;">netEnter(PR1);</span>
+  await PR2.$promise<span style="color: #676E95;">; </span><span style="color: #676E95;">netEnter(PR2);</span>
+  await PR3.$promise<span style="color: #676E95;">; </span><span style="color: #676E95;">netEnter(PR3);</span>
+
+  console.log(<span style="color: #c3e88d;">"ProcL"</span><span style="color: #89DDFF;">,</span> PR1<span style="color: #89DDFF;">,</span> PR1.$promise)
+
+
+
+  let <span style="color: #ffcb6b;">{</span> ProcGroupAndAttach <span style="color: #ffcb6b;">}</span> = StateChannels<span style="color: #676E95;">;</span>
+  GR1 = new ProcGroupAndAttach(PR1<span style="color: #89DDFF;">,</span> PR2<span style="color: #89DDFF;">,</span> PR3)<span style="color: #676E95;">;</span>
+
+  await GR1.$promise<span style="color: #676E95;">; </span><span style="color: #676E95;">console.log("GR1", GR1.$promise);</span>
+
+
+<span style="color: #ffcb6b;">}</span>
+EOF
+)
+(<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">call-to-exit?</span>)
+  (<span style="color: #82aaff;">##</span>inline-host-expression <span style="color: #c3e88d;">"@host2scm@(StateChannels.exit)"</span>))
+
+(<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">n</span> 0)
+
+  (<span style="color: #89DDFF;">let</span> <span style="color: #82aaff;">lp</span> ()
+    (<span style="color: #89DDFF;">let</span> ((e? (call-to-exit?)))
+     <span style="color: #676E95;">; </span><span style="color: #676E95;">(displayln "Call to exit? " (call-to-exit?) " " n)</span>
+      (<span style="color: #89DDFF;">set!</span> n (+ n 1))
+      (<span style="color: #89DDFF;">if</span> e? (displayln <span style="color: #c3e88d;">"Exiting..."</span>)
+          (<span style="color: #89DDFF;">begin</span> (<span style="color: #82aaff;">##</span>thread-sleep! 2)
+                 (lp)))))
+
+  (displayln <span style="color: #c3e88d;">"Ending Primordial thread"</span>))
+
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orga284903" class="outline-2">
+<h2 id="orga284903">File <code>build.ss</code></h2>
+<div class="outline-text-2" id="text-orga284903">
+<div class="org-src-container">
+<pre class="src src-scheme">(<span style="color: #89DDFF;">import</span> <span style="color: #82aaff;">:std/make</span>)
+
+<span style="color: #676E95;">;; </span><span style="color: #82aaff; font-size: 120%;">* Meta Data</span>
+<span style="color: #676E95;">;; </span><span style="color: #676E95;">the source directory anchor.</span>
+(<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">srcdir</span>
+  (path-normalize (path-directory (this-source-file))))
+
+(<span style="color: #89DDFF;">if</span> (equal? srcdir (current-directory)) <span style="color: #82aaff;">#t</span>
+    (<span style="color: #89DDFF;">begin</span>
+      (displayln <span style="color: #c3e88d;">"going into "</span> srcdir <span style="color: #c3e88d;">" for building state-channels"</span>
+                 <span style="color: #c3e88d;">" from "</span> (initial-current-directory))
+      (current-directory srcdir)))
+
+<span style="color: #676E95;">;; </span><span style="color: #82aaff; font-size: 120%;">* Build as a module library with static scm files as well.</span>
+<span style="color: #676E95;">;; </span><span style="color: #676E95;">the library module build specification</span>
+(<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">library-build-spec</span>)
+  (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">lib-build-spec</span> <span style="color: #89DDFF;">'</span>(<span style="color: #c3e88d;">"src/socks"</span> <span style="color: #c3e88d;">"examples/mp1"</span> <span style="color: #c3e88d;">"examples/mp1_1"</span> <span style="color: #c3e88d;">"exe"</span>))
+  (<span style="color: #89DDFF;">let</span> <span style="color: #82aaff;">src</span> ((fs (directory-files <span style="color: #c3e88d;">"src"</span>)))
+    <span style="color: #676E95;">;; </span><span style="color: #676E95;">(displayln "have " (length fs) " files in src")</span>
+    (<span style="color: #89DDFF;">if</span> (<span style="color: #89DDFF;">not</span> (null? fs))
+      (<span style="color: #89DDFF;">let</span> ((f (car fs)))
+        <span style="color: #676E95;">;; </span><span style="color: #676E95;">(displayln "f:" f (equal? f "clish_prg.ss"))</span>
+        (<span style="color: #89DDFF;">if</span> (<span style="color: #89DDFF;">and</span> (equal? (path-extension f) <span style="color: #c3e88d;">".ss"</span>)
+                 (<span style="color: #89DDFF;">not</span> (equal? f <span style="color: #c3e88d;">"clish.ss"</span>))
+                 (<span style="color: #89DDFF;">not</span> (equal? f <span style="color: #c3e88d;">"scm2js.ss"</span>))
+                 (<span style="color: #89DDFF;">not</span> (equal? f <span style="color: #c3e88d;">"clish_prg.ss"</span>)))
+          (<span style="color: #89DDFF;">set!</span> lib-build-spec
+            (cons (path-expand (path-strip-extension f)
+                               <span style="color: #c3e88d;">"src/"</span>)
+                  lib-build-spec)))
+        (src (cdr fs)))))
+
+  lib-build-spec)
+
+(<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">init-lib-build-spec</span> (library-build-spec))
+(<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">make-lib</span> (spec init-lib-build-spec))
+  <span style="color: #676E95;">;; </span><span style="color: #676E95;">(displayln "making library from:" lib-build-spec)</span>
+  (make <span style="color: #82aaff;">srcdir:</span> srcdir
+        <span style="color: #82aaff;">bindir:</span> srcdir
+        <span style="color: #82aaff;">libdir:</span> (path-expand <span style="color: #c3e88d;">"lib/"</span> srcdir)
+        <span style="color: #82aaff;">optimize:</span> <span style="color: #82aaff;">#t</span>
+        <span style="color: #82aaff;">debug:</span> <span style="color: #89DDFF;">'</span>src      <span style="color: #676E95;">; </span><span style="color: #676E95;">enable debugger introspection for library modules</span>
+        <span style="color: #82aaff;">static:</span> <span style="color: #82aaff;">#t</span>       <span style="color: #676E95;">; </span><span style="color: #676E95;">generate static compilation artifacts; required!</span>
+        <span style="color: #676E95;">;; </span><span style="color: #676E95;">prefix: "mukn/state-channels/</span>
+        <span style="color: #676E95;">;; </span><span style="color: #676E95;">build-deps: "build-deps" ; this value is the default</span>
+        spec))
+
+
+<span style="color: #676E95;">;; </span><span style="color: #82aaff; font-size: 120%;">* The machine code binary: =bin/exe=</span>
+
+(<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">bin-build-spec</span> <span style="color: #89DDFF;">'</span>((<span style="color: #82aaff;">static-exe:</span> <span style="color: #c3e88d;">"exe"</span>)))
+
+
+(<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">make-bin</span>)
+  (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">libdir</span> (path-expand <span style="color: #c3e88d;">"lib/"</span> srcdir))
+  (add-load-path libdir)
+  <span style="color: #676E95;">;; </span><span style="color: #676E95;">this action builds the static executables -- no debug introspection</span>
+  (make <span style="color: #82aaff;">srcdir:</span> srcdir
+        <span style="color: #82aaff;">bindir:</span> (path-expand <span style="color: #c3e88d;">"bin/"</span> srcdir)
+        <span style="color: #82aaff;">libdir:</span> libdir
+        <span style="color: #82aaff;">verbose:</span> 2
+        <span style="color: #82aaff;">optimize:</span> <span style="color: #82aaff;">#t</span>
+        <span style="color: #82aaff;">debug:</span> <span style="color: #82aaff;">#f</span>             <span style="color: #676E95;">; </span><span style="color: #676E95;">no debug bloat for executables</span>
+        <span style="color: #82aaff;">static:</span> <span style="color: #82aaff;">#t</span>            <span style="color: #676E95;">; </span><span style="color: #676E95;">generate static compilation artifacts; required!</span>
+        <span style="color: #82aaff;">build-deps:</span> <span style="color: #c3e88d;">"build-deps-bin"</span> <span style="color: #676E95;">; </span><span style="color: #676E95;">importantly, pick a file that differs from above</span>
+        bin-build-spec))
+
+<span style="color: #676E95;">;; </span><span style="color: #82aaff; font-size: 120%;">* The node.js executable in =js/bin/exe=</span>
+
+(<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">js-bin-build-spec</span>
+  <span style="color: #89DDFF;">'</span>((<span style="color: #82aaff;">static-exe:</span> <span style="color: #c3e88d;">"exe"</span>
+                                        <span style="color: #676E95;">; </span><span style="color: #676E95;">"-verbose"</span>
+                 <span style="color: #c3e88d;">"-target"</span> <span style="color: #c3e88d;">"js"</span>)))
+
+<span style="color: #676E95;">#;(def (compile-static-exe mod opts settings)</span>
+<span style="color: #676E95;">  (def srcpath (source-path mod ".ss" settings))</span>
+<span style="color: #676E95;">  (def binpath (binary-path mod opts settings))</span>
+<span style="color: #676E95;">  (def gsc-opts (compile-exe-gsc-opts opts))</span>
+<span style="color: #676E95;">  (def gxc-opts</span>
+<span style="color: #676E95;">    [invoke-gsc: #t</span>
+<span style="color: #676E95;">                 output-file: binpath</span>
+<span style="color: #676E95;">                 verbose: (settings-verbose&gt;=? settings 9)</span>
+<span style="color: #676E95;">                 debug: (settings-static-debug settings)</span>
+<span style="color: #676E95;">                 (when/list gsc-opts [gsc-options: gsc-opts]) ...])</span>
+
+<span style="color: #676E95;">  (message "... compile static js? exe " mod " -&gt; " gxc-opts)</span>
+<span style="color: #676E95;">  (gxc-compile mod gsc-opts (make-settings-static settings))</span>
+<span style="color: #676E95;">  (message "... compile static exe " mod " -&gt; " binpath)</span>
+<span style="color: #676E95;">  (gxc#compile-static-exe srcpath gxc-opts)</span><span style="color: #676E95;">)</span>
+
+<span style="color: #676E95;">;</span><span style="color: #676E95;">(set! std/make#compile-static-exe compile-static-exe)</span>
+(<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">make-js-bin</span>)
+  (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">libdir</span> (path-expand <span style="color: #c3e88d;">"lib/"</span> srcdir))
+  (add-load-path libdir)
+  <span style="color: #676E95;">;; </span><span style="color: #676E95;">this action builds the static executables -- no debug introspection</span>
+  (make <span style="color: #82aaff;">srcdir:</span> srcdir
+        <span style="color: #82aaff;">bindir:</span> (path-expand <span style="color: #c3e88d;">"js/bin/"</span> srcdir)
+        <span style="color: #82aaff;">libdir:</span> libdir
+        <span style="color: #82aaff;">verbose:</span> 2
+        <span style="color: #82aaff;">optimize:</span> <span style="color: #82aaff;">#f</span>
+        <span style="color: #82aaff;">debug:</span> <span style="color: #82aaff;">#f</span>             <span style="color: #676E95;">; </span><span style="color: #676E95;">no debug bloat for executables</span>
+        <span style="color: #82aaff;">static:</span> <span style="color: #82aaff;">#t</span>            <span style="color: #676E95;">; </span><span style="color: #676E95;">generate static compilation artifacts; required!</span>
+        <span style="color: #82aaff;">build-deps:</span> <span style="color: #c3e88d;">"build-deps-js-bin"</span> <span style="color: #676E95;">; </span><span style="color: #676E95;">importantly, pick a file that differs from above</span>
+        js-bin-build-spec))
+
+<span style="color: #676E95;">;; </span><span style="color: #82aaff; font-size: 120%;">* HTML build spec</span>
+
+(<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">html-bin-build-spec</span>
+<span style="color: #89DDFF;">'</span>((<span style="color: #82aaff;">static-exe:</span>
+   <span style="color: #c3e88d;">"html/state-channels"</span>  <span style="color: #82aaff;">bin:</span> <span style="color: #c3e88d;">"state-channels.js.stripped"</span>
+   <span style="color: #c3e88d;">"-target"</span> <span style="color: #c3e88d;">"js"</span>)))
+
+(<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">make-html-bin</span>)
+  (<span style="color: #89DDFF;">def</span> <span style="color: #82aaff;">libdir</span> (path-expand <span style="color: #c3e88d;">"lib/"</span> srcdir))
+  (add-load-path libdir)
+  <span style="color: #676E95;">;; </span><span style="color: #676E95;">this action builds the static executables -- no debug introspection</span>
+  (make <span style="color: #82aaff;">srcdir:</span> srcdir
+        <span style="color: #82aaff;">bindir:</span> (path-expand <span style="color: #c3e88d;">"html"</span> srcdir)
+        <span style="color: #82aaff;">libdir:</span> libdir
+        <span style="color: #82aaff;">verbose:</span> 2
+        <span style="color: #82aaff;">optimize:</span> <span style="color: #82aaff;">#f</span>
+        <span style="color: #82aaff;">debug:</span> <span style="color: #82aaff;">#f</span>             <span style="color: #676E95;">; </span><span style="color: #676E95;">no debug bloat for executables</span>
+        <span style="color: #82aaff;">static:</span> <span style="color: #82aaff;">#t</span>            <span style="color: #676E95;">; </span><span style="color: #676E95;">generate static compilation artifacts; required!</span>
+        <span style="color: #82aaff;">build-deps:</span> <span style="color: #c3e88d;">"build-deps-html-bin"</span> <span style="color: #676E95;">; </span><span style="color: #676E95;">importantly, pick a file that differs from above</span>
+        html-bin-build-spec))
+
+(<span style="color: #89DDFF;">def</span> (<span style="color: #82aaff;">main</span> . args)
+  (<span style="color: #89DDFF;">match</span> args
+    (<span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"copy-gerbil-state-src"</span><span style="color: #ffcb6b;">]</span>
+     (shell-command <span style="color: #c3e88d;">"./build gerbil"</span>))
+    (<span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"copy-filesocks_dummy"</span><span style="color: #ffcb6b;">]</span>
+     (shell-command <span style="color: #c3e88d;">"backends/build filesocks_dummy"</span>))
+    (<span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"lib"</span><span style="color: #ffcb6b;">]</span> (make-lib)
+     (make-lib (library-build-spec)))
+    (<span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"bin"</span><span style="color: #ffcb6b;">]</span> (make-bin))
+    (<span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"node"</span><span style="color: #ffcb6b;">]</span> (make-js-bin))
+    (<span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"browser"</span><span style="color: #ffcb6b;">]</span> (make-html-bin))
+    (<span style="color: #ffcb6b;">[]</span>
+     (<span style="color: #89DDFF;">map</span> main
+          <span style="color: #ffcb6b;">[</span><span style="color: #c3e88d;">"copy-gerbil-state-src"</span>
+           <span style="color: #c3e88d;">"copy-filesocks_dummy"</span>
+           <span style="color: #c3e88d;">"lib"</span> <span style="color: #c3e88d;">"bin"</span> <span style="color: #c3e88d;">"node"</span> <span style="color: #c3e88d;">"browser"</span><span style="color: #ffcb6b;">]</span>))))
+
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="date">Date: 2023-03-28 Tue 10:34</p>
+<p class="author">Author: Drew Crampsie</p>
+<p class="date">Created: 2023-03-28 Tue 15:14</p>
+<p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

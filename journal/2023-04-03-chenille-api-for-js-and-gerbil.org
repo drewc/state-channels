@@ -7,88 +7,33 @@
 
 We've got to "simulate" the Chenille state channels API in JS.
 
-#+begin_src js
-  /*
- * State channels API
- */
+Here's what we figured out the night of the 4th.
 
-// Petname, locally-assigned unique name for account, *never* shared externally, see
-// https://spritelyproject.org/news/petname-systems.html
-// https://spritely.institute/news/two-petnames-papers-are-released.html
-type Petname = string; // e.g. "bob", "auntMay", "peter", "spiderman"...
+#+begin_src scheme
+;; A Chenille is essentially a EUTXO (UTXO with multiple assets and a lock script)
+;; with a persistent id (its ChenilleId) and additional data that can be queried.
+(define-type ChenilleState
+  (Record
+   balances: [Balances]
+   control: [(ContentAddressed ChenilleTerms)]
+   data: Bytes32)) ;; optional data synchronously updated by the control program,
+   ;; typically a mutually agreed random nonce to prevent replay attacks on multi-session chenilles,
+   ;; or the hash of such a nonce and some data to be used as input for the term
+   ;; and verified as output for more elaborate chenilles.
+   ;; For instance, it could include a digest of the cumulated-deposits and
+   ;; cumulated-withdrawals balances for state channels with asynchronous deposits and withdrawals, etc.
 
-// Network identifier. To Be Specified
-type Network = string; // e.g. "ethereum", "cosmos", "laconic"...
-
-// Address on the specified network
-type Address = string; // e.g. on Ethereum, "0xb0bb1ed229f5Ed588495AC9739eD1555f5c3aabD"
-
-// Accounts
-interface Account {
-  readonly petname: Petname;
-  readonly network: Network|undefined;
-  readonly address: Address;
-
-  constructor(petname: Petname, network: Network|undefined, address: Address);
-  isAccount(): boolean;
-}
-
-// Login to an account, allowing us to use it in an active role.
-// TODO: integrate with wallet or use its existing facility.
-async function login(petname: Petname, passphrase: string): boolean;
-
-// Choose current account to use in active role.
-function iam(account: Account): boolean;
-
-// Display current account
-function whoami(): Account|null;
-
-// Asset name
-type AssetName = string; // e.g. "ETH", "LNT", "USDC"...
-
-// Vector of assets
-type Assets = [assetName: AssetName]: BigInt
-
-// Assignment of assets to Petname-identified accounts
-// used to specify deposits to or withdrawal from state channels, etc.
-// for the initial deposit, specify an account with an empty vector of assets
-// for participants who will be part of the state channel yet won't be depositing at first
-interface PetLedger {
-  [index: Petname]: Assets;
-}
-
-// Condition driving the release of table stakes in case of challenge.
-// Table stakes are all assets in the channel that are assigned to a participant
-type ChenilleCondition = string;
-
-type ChenilleState = {
-  sequence: BigInt, // sequence number of latest consensually signed state
-  assets: Assets, // total assets under management
-  balances: PetLedger, // assets fully assigned to each participant
-  condition: ChenilleCondition, // associated condition for table stakes
-  cumulatedDeposits: PetLedger, // cumulated deposits of each participant since creation
-  cumulatedWithdrawals: PetLedger, // cumulated withdrawals of each participant since creation
-};
-
-// Our State Channel interface
-interface Chenille {
-  readonly network : Network, // blockchain network on which the state channel is managed
-  readonly parent : Address|undefined, // address for the contract that manages the channel
-  readonly nonce : string, // nonce identifying the state channel within the network or contract
-
-  async constructor(initialDeposit: PetLedger);
-  isChenille(): boolean;
-
-  status(): ChenilleStatus;
-
-  async currentState(): ChenilleState;
-  async send(assets: Assets, recipient: Petname): boolean;
-  async deposit(assets: Assets): boolean;
-  async withdraw(assets: Assets): boolean;
-  async close(): boolean;
-}
-
+;; Additional data, interaction-specific, associated to a Chenille
+;; that can be queried asynchronously by other contracts.
+;; That's where e.g. the state of the Laconic Bridge will be stored,
+;; or messages sent by oracles and bridges, etc.
+;; In particular, some state channels that allow for asynchronous deposits and withdrawals
+;; will have in their heap entries as follow
+;; cumulatedDeposits: [Balances] ;; cumulated deposits of each participant since creation
+;; cumulatedWithdrawals: [Balances] ;; cumulated withdrawals of each participant since creation
 #+end_src
+
+So the following is from an older version kinda/sorta but it matters not as after doing so, we have shared state!
 
 * Mirroring state
 
@@ -121,8 +66,8 @@ When we start we give our state and recieve theirs.
 #+begin_src js :noweb-ref State
   State.prototype.send = function (stream) {
     const vec = uint8ArrayFromString(JSON.stringify(this))
-    console.log("Sending ", this, ' as ', vec, ' over ', stream)
-    return pipe(vec,stream.sink)
+    // console.log("Sending ", this, ' as ', vec, ' over ', stream)
+    return pipe([vec],stream)
   }
 
   State.prototype.recieve = function (stream) {
@@ -136,8 +81,41 @@ When we start we give our state and recieve theirs.
                  }).then(_=> state)
     })()
   }
+  State.prototype.protocol = '/state-channels/0.0.1';
 
-  Object.assign(StateChannels, { state: new State() })
+  State.prototype.dial = function (peer) {
+    return libp2p.dialProtocol(peer, this.protocol)
+      .then(stream => {
+        //console.log(peer.toString(), " has answered, giving it ", this)
+        return this.send(stream) // pipe(
+        //   [uint8ArrayFromString(JSON.stringify(this))],
+        //   stream
+        // )
+      })
+  }
+
+  State.prototype.answer = function (conn) {
+    const { connection, stream } = conn, { remotePeer } = connection;
+    let remote_state;
+    return pipe(
+      stream,
+      async function (source) {
+        for await (const msg of source) {
+          remote_state = uint8ArrayToString(msg.subarray())
+        }
+      }
+    ).then(_=> JSON.parse(remote_state))
+  }
+
+  State.prototype.merge = function (new_state) {
+    this.sequence = this.sequence + 1;
+    console.log("Have assets: ", this.assets, " and new ", new_state)
+    Object.assign(this.assets, new_state.assets);
+    return this;
+  }
+
+
+    Object.assign(StateChannels, { state: new State() })
 #+end_src
 
 
@@ -218,166 +196,180 @@ When we start we give our state and recieve theirs.
 * /File/ =index.js=
 
 #+begin_src js :tangle ../js/index.js
-    import { createLibp2p } from 'libp2p'
-    import { webSockets } from '@libp2p/websockets'
-    import { webRTCStar } from '@libp2p/webrtc-star'
-    import { noise } from '@chainsafe/libp2p-noise'
-    import { mplex } from '@libp2p/mplex'
-    import { bootstrap } from '@libp2p/bootstrap'
+  import { createLibp2p } from 'libp2p'
+  import { webSockets } from '@libp2p/websockets'
+  import { webRTCStar } from '@libp2p/webrtc-star'
+  import { noise } from '@chainsafe/libp2p-noise'
+  import { mplex } from '@libp2p/mplex'
+  import { bootstrap } from '@libp2p/bootstrap'
 
-    import StateChannels from './state-channels'
+  import StateChannels from './state-channels'
 
-    import { pipe } from 'it-pipe'
-    import { map } from 'streaming-iterables'
-    import { toBuffer } from 'it-buffer'
-    import { fromString as uint8ArrayFromString } from 'uint8arrays/from-string'
-    import { toString as uint8ArrayToString } from 'uint8arrays/to-string'
+  import { pipe } from 'it-pipe'
+  import { map } from 'streaming-iterables'
+  import { toBuffer } from 'it-buffer'
+  import { fromString as uint8ArrayFromString } from 'uint8arrays/from-string'
+  import { toString as uint8ArrayToString } from 'uint8arrays/to-string'
 
-    Object.assign(StateChannels, { pipe, uint8ArrayFromString })
+  Object.assign(StateChannels, { pipe, uint8ArrayFromString })
 
 
-    document.addEventListener('DOMContentLoaded', async () => {
-      const wrtcStar = webRTCStar()
+  document.addEventListener('DOMContentLoaded', async () => {
+    const wrtcStar = webRTCStar()
 
-      // Create our libp2p node
-      const libp2p = await createLibp2p({
-        start: false,
-        connectionManager: {
-      /**
-       ,* The total number of connections allowed to be open at one time
-       ,*/
-      maxConnections: 10,
-      minConnections: 1,
-        },
-        addresses: {
-          // Add the signaling server address, along with our PeerId to our multiaddrs list
-          // libp2p will automatically attempt to dial to the signaling server so that it can
-          // receive inbound connections from other peers
-          listen: [
-            '/dns4/wrtc-star1.par.dwebops.pub/tcp/443/wss/p2p-webrtc-star',
-            '/dns4/wrtc-star2.sjc.dwebops.pub/tcp/443/wss/p2p-webrtc-star'
-          ]
-        },
-        transports: [
-          webSockets(),
-          wrtcStar.transport
-        ],
-        connectionEncryption: [noise()],
-        streamMuxers: [mplex()],
-        peerDiscovery: [
-          wrtcStar.discovery //,
-          // bootstrap({
-          //   list: [
-          //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
-          //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
-          //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmZa1sAxajnQjVM8WjWXoMbmPd7NsWhfKsPkErzpm9wGkp',
-          //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa',
-          //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt'
-          //   ]
-          // })
+    // Create our libp2p node
+    const libp2p = await createLibp2p({
+      start: false,
+      connectionManager: {
+    /**
+     ,* The total number of connections allowed to be open at one time
+     ,*/
+    maxConnections: 10,
+    minConnections: 1,
+      },
+      addresses: {
+        // Add the signaling server address, along with our PeerId to our multiaddrs list
+        // libp2p will automatically attempt to dial to the signaling server so that it can
+        // receive inbound connections from other peers
+        listen: [
+          '/dns4/wrtc-star1.par.dwebops.pub/tcp/443/wss/p2p-webrtc-star',
+          '/dns4/wrtc-star2.sjc.dwebops.pub/tcp/443/wss/p2p-webrtc-star'
         ]
-      })
+      },
+      transports: [
+       // webSockets(),
+        wrtcStar.transport
+      ],
+      connectionEncryption: [noise()],
+      streamMuxers: [mplex()],
+      peerDiscovery: [
+        wrtcStar.discovery //,
+        // bootstrap({
+        //   list: [
+        //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
+        //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
+        //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmZa1sAxajnQjVM8WjWXoMbmPd7NsWhfKsPkErzpm9wGkp',
+        //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa',
+        //     '/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt'
+        //   ]
+        // })
+      ]
+    })
 
-      // UI elements
-      const status = document.getElementById('status')
-      const output = document.getElementById('output')
+    // UI elements
+    const status = document.getElementById('status')
+    const output = document.getElementById('output')
 
-      output.textContent = ''
+    output.textContent = ''
 
-      function log (txt) {
-        console.info(txt)
-         // output.textContent += `${txt.trim()}\n`
-      }
+    function log (txt) {
+      console.info(txt)
+       // output.textContent += `${txt.trim()}\n`
+    }
 
-       // Listen for new connections to peers
-          libp2p.connectionManager.addEventListener('peer:connect', (evt) => {
-            const connection = evt.detail, id = connection.remotePeer
-            const { state } = StateChannels;
-            console.log(`Connected to ${id}`)
-            libp2p.dialProtocol(id, '/state-channels/0.0.1').then(stream => {
-              console.log(id.toString(), " has answered")
+     // Listen for new connections to peers
+        libp2p.connectionManager.addEventListener('peer:connect', (evt) => {
+          const connection = evt.detail, id = connection.remotePeer
+          const { state, Peer } = StateChannels;
+          console.log(`Connected to ${id}`, state)
+          state.dial(id).then(_=> {
+            const peer = new Peer({ id: id.toString(),
+                                    connection
+                                  });
+            return peer
 
-              const newpeer = new StateChannels.Peer(
-                { id: id.toString(),
-                  stdin: stream,
-                  libp2p: libp2p
-                })
-              pipe(
-                [uint8ArrayFromString(JSON.stringify(state))],
-                stream
-              )
-              console.log ('sent ', state.send(stream));
+            }). catch(e => connection.close())
+          // libp2p.dialProtocol(id, '/state-channels/0.0.1')
+           // .then(stream => {
+          //    console.log(id.toString(), " has answered")
 
-
-              }).catch(e => connection.close() );
-
-           // setTimeout(_=>{ connection.close() }, 100)
-          })
-
-
-           // Listen for new peers
-       libp2p.addEventListener('peer:discovery', (evt) => {
-         const peer = evt.detail, id = peer.id.toString()
-         // console.log(`Found peer ${peer.id.toString()}`)
-
-         if (StateChannels.findPeer(id)) {
-           console.log("Already have this peer:", id)
-           return false
-         }
-
-
-         // dial them when we discover them
-         libp2p.dialProtocol(evt.detail.id, '/other-state-channels/0.0.1').then(stream => {
-
-           //stream.close()
-         }).catch(err => {
-      //     log(`Could not dial ${evt.detail.id}`, err, peer)
-         })
-       });
-       let conns = []
-            // Listen for peers disconnecting
-       libp2p.connectionManager.addEventListener('peer:disconnect', (evt) => {
-         const connection = evt.detail
-         console.log(`Disconnected from ${connection.remotePeer.toString()}`)
-       })
-
-       // Handle messages for the protocol
-        var mylibp2phandler = libp2p.handle('/state-channels/0.0.1', async (conn) => {
-          const { connection, stream } = conn, { remotePeer } = connection,
-                peer = new StateChannels.Peer({
-                  id: remotePeer.toString(),
-                  stdout: stream,
-                  libp2p
-                })
-
-          console.log("handling/answering dial", remotePeer.toString())
-          pipe(
-                stream,
-                async function (source) {
-                  for await (const msg of source) {
-                    console.log(uint8ArrayToString(msg.subarray()))
-                  }
-                }
+          // //   const newpeer = new StateChannels.Peer(
+          // //     { id: id.toString(),
+          // //       stdin: stream,
+          // //       libp2p: libp2p
+          // //     })
+          //    pipe(
+          //      [uint8ArrayFromString(JSON.stringify(state))],
+          //      stream
+          //    )
+          // //   console.log ('sent ', state.send(stream));
 
 
-           )
-          pipe(
-             [uint8ArrayFromString('from 2 to 1')],
-             stream
-           )
+          //    }).catch(e => connection.close() );
 
-
+         // setTimeout(_=>{ connection.close() }, 100)
         })
 
-      status.innerText = 'libp2p started!'
-      console.log(`libp2p id is ${libp2p.peerId.toString()}`)
 
-      var { StateChannels } = globalThis;
-      StateChannels.state.deposit(libp2p.peerId.toString(), 0)
+         // Listen for new peers
+     libp2p.addEventListener('peer:discovery', (evt) => {
+       const peer = evt.detail, id = peer.id.toString()
+       // console.log(`Found peer ${peer.id.toString()}`)
 
-      // Export libp2p to the window so you can play with the API
-      globalThis.libp2p = libp2p
+       if (StateChannels.findPeer(id)) {
+         console.log("Already have this peer:", id)
+         return false
+       }
 
-    })
+
+       // dial them when we discover them
+       libp2p.dialProtocol(evt.detail.id, '/other-state-channels/0.0.1').then(stream => {
+
+         //stream.close()
+       }).catch(err => {
+    //     log(`Could not dial ${evt.detail.id}`, err, peer)
+       })
+     });
+     let conns = []
+          // Listen for peers disconnecting
+     libp2p.connectionManager.addEventListener('peer:disconnect', (evt) => {
+       const connection = evt.detail
+       console.log(`Disconnected from ${connection.remotePeer.toString()}`)
+     })
+
+     // Handle messages for the protocol
+      var mylibp2phandler = libp2p.handle('/state-channels/0.0.1', async (conn) => {
+        const { state } = StateChannels;
+        return state.answer(conn).then (s => {
+          state.merge(s)
+          demoUI.displayState()
+          console.log("Merged State:", state)
+        });
+        const { connection, stream } = conn, { remotePeer } = connection,
+              peer = new StateChannels.Peer({
+                id: remotePeer.toString(),
+                stdout: stream,
+                libp2p
+              })
+
+        console.log("handling/answering dial", remotePeer.toString())
+        pipe(
+              stream,
+              async function (source) {
+                for await (const msg of source) {
+                  console.log(uint8ArrayToString(msg.subarray()))
+                }
+              }
+
+
+         )
+        pipe(
+           [uint8ArrayFromString('from 2 to 1')],
+           stream
+         )
+
+
+      })
+
+    status.innerText = 'StateChannels started!'
+    console.log(`libp2p id is ${libp2p.peerId.toString()}`)
+
+    var { StateChannels } = globalThis;
+    StateChannels.state.deposit(libp2p.peerId.toString(), 0)
+
+    // Export libp2p to the window so you can play with the API
+    globalThis.libp2p = libp2p
+
+  })
 
 #+end_src
