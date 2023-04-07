@@ -75,10 +75,6 @@ import { toString as uint8ArrayToString } from 'uint8arrays/to-string'
   }
   
   
-  
-  
-  
-  
     Object.assign(StateChannels, { state: new State() })
 
   function Peer(detail = { id: "RemoteId",
