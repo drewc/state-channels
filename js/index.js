@@ -1,4 +1,4 @@
-import { createLibp2p } from 'libp2p'
+import { createLibp2p } from '@cerc-io/libp2p'
 import { webSockets } from '@libp2p/websockets'
 import { webRTCStar } from '@libp2p/webrtc-star'
 import { noise } from '@chainsafe/libp2p-noise'

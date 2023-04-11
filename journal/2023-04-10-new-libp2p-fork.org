@@ -1,0 +1,53 @@
+#+title: New Libp2p fork
+#+date: <2023-04-10 16:54>
+#+description:
+#+filetags:
+
+
+#+begin_src bash :session libp2p-shell :dir ../
+  git rm -r libp2p
+#+end_src
+#+begin_src bash :session libp2p-shell :dir ../
+  git remote add cerc-js-libp2p git@github.com:cerc-io/js-libp2p.git
+  git fetch cerc-js-libp2p
+  git stash
+  git subtree add --prefix js-libp2p cerc-js-libp2p laconic --squash
+  git stash pop
+
+#+end_src
+#+begin_src bash :session libp2p-shell :dir ../
+  cd js-libp2p
+  npm install
+  npm run build
+  npm audit fix
+  npm link
+  cd ..
+#+end_src
+
+#+begin_src bash :session libp2p-shell :dir ../ :results verbatim :wrap src diff
+  cd js/; git diff package.json | cat
+#+end_src
+=>
+#+begin_src diff
+bash: cd: js/: No such file or directory
+diff --git a/js/package.json b/js/package.json
+index fe3bfa49..5e51003c 100644
+--- a/js/package.json
++++ b/js/package.json
+@@ -11,6 +11,7 @@
+   },
+   "license": "ISC",
+   "dependencies": {
++    "@cerc-io/libp2p": "file:../js-libp2p",
+     "@chainsafe/libp2p-noise": "^11.0.0",
+     "@libp2p/bootstrap": "^6.0.0",
+     "@libp2p/mplex": "^7.0.0",
+@@ -18,7 +19,6 @@
+     "@libp2p/websockets": "^5.0.0",
+     "it-buffer": "^0.1.3",
+     "it-pipe": "^3.0.0",
+-    "libp2p": "^0.43.3",
+     "streaming-iterables": "^7.1.0"
+   },
+   "devDependencies": {
+#+end_src
